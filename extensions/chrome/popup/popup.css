@@ -1,0 +1,162 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  width: 300px;
+  color: #1a1a1a;
+}
+
+.container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.ready { background: #22c55e; }
+.status-dot.app_unavailable { background: #eab308; }
+.status-dot.host_unavailable { background: #ef4444; }
+
+#status-text {
+  font-weight: 500;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.filters {
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+}
+
+.filters summary {
+  padding: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.filter-group {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #666;
+}
+
+.filter-group input[type="text"],
+.filter-group input[type="number"] {
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.size-input {
+  display: flex;
+  gap: 4px;
+}
+
+.size-input input {
+  flex: 1;
+}
+
+.size-input select {
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+#save-filters {
+  padding: 6px 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#save-filters:hover {
+  background: #1d4ed8;
+}
+
+.blocklist-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ignore-btn {
+  padding: 6px 12px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.ignore-btn:hover { background: #b91c1c; }
+.ignore-btn:disabled { background: #9ca3af; cursor: default; }
+
+.blocklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blocklist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.blocklist-item button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ef4444;
+  font-size: 14px;
+  padding: 0 2px;
+}
