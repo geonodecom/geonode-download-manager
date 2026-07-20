@@ -1,9 +1,18 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
-/// Opens a file or directory with the platform file manager / default app.
+const _engineChannel = MethodChannel(
+  'com.fhsinchy.geonode_download_manager/engine',
+);
+
+/// Opens a file, directory, or content URI with the platform default app.
 Future<void> openPath(String path) async {
+  if (path.startsWith('content:') || Platform.isAndroid) {
+    await _engineChannel.invokeMethod<void>('openUri', {'uri': path});
+    return;
+  }
   if (Platform.isWindows) {
     await Process.start('explorer', [path], mode: ProcessStartMode.detached);
     return;
@@ -17,6 +26,9 @@ Future<void> openPath(String path) async {
 
 /// Fallback Downloads directory when [getDownloadsDirectory] is unavailable.
 String defaultDownloadsFallback() {
+  if (Platform.isAndroid) {
+    return 'Downloads';
+  }
   if (Platform.isWindows) {
     final profile = Platform.environment['USERPROFILE'];
     if (profile != null && profile.trim().isNotEmpty) {

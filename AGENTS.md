@@ -1,6 +1,8 @@
 # GeoNode Download Manager Agent Guide
 
-GeoNode Download Manager is a Linux-first Flutter download manager powered by aria2.
+GeoNode Download Manager is a Flutter download manager for Linux, Windows, and
+Android. Desktop builds are powered by aria2; Android uses a native foreground
+download service.
 
 Keep this file limited to durable project expectations. Discover structure,
 types, commands, and behavior from the code, tests, README, and manifests.
@@ -34,5 +36,7 @@ flutter analyze
 flutter test
 flutter build linux --release
 flutter build windows --release
+flutter build apk --release
+flutter build appbundle --release
 make run
 ```

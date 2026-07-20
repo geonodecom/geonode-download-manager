@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -72,102 +74,117 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isAndroid = Platform.isAndroid;
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return AlertDialog(
       title: const Text('Add Download'),
       content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _url,
-              enabled: !_submitting,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://example.com/file.iso',
-              ),
-            ),
-            if (widget.capture != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _captureLabel(widget.capture!),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
+        width: narrow ? null : 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _url,
+                enabled: !_submitting,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'URL',
+                  hintText: 'https://example.com/file.iso',
                 ),
               ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              controller: _fileName,
-              enabled: !_submitting,
-              decoration: const InputDecoration(
-                labelText: 'Filename override',
-                hintText: 'Optional',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _directory,
-                    enabled: !_submitting,
-                    decoration: const InputDecoration(labelText: 'Save to'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonal(
-                  onPressed: _submitting ? null : _pickDirectory,
-                  child: const Text('Browse'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    initialValue: _split,
-                    decoration: const InputDecoration(labelText: 'Connections'),
-                    items: const [1, 4, 8, 16, 24, 32]
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value.toString()),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _submitting
-                        ? null
-                        : (value) => setState(() => _split = value ?? 16),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Start now'),
-                    value: _startImmediately,
-                    onChanged: _submitting
-                        ? null
-                        : (value) => setState(() => _startImmediately = value),
+              if (widget.capture != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _captureLabel(widget.capture!),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
-            ),
-            if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              TextField(
+                controller: _fileName,
+                enabled: !_submitting,
+                decoration: const InputDecoration(
+                  labelText: 'Filename override',
+                  hintText: 'Optional',
+                ),
               ),
+              const SizedBox(height: 12),
+              if (isAndroid)
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Files are saved to the system Downloads folder.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _directory,
+                        enabled: !_submitting,
+                        decoration: const InputDecoration(labelText: 'Save to'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonal(
+                      onPressed: _submitting ? null : _pickDirectory,
+                      child: const Text('Browse'),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _split,
+                      decoration:
+                          const InputDecoration(labelText: 'Connections'),
+                      items: const [1, 4, 8, 16, 24, 32]
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value.toString()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _submitting
+                          ? null
+                          : (value) => setState(() => _split = value ?? 16),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Start now'),
+                      value: _startImmediately,
+                      onChanged: _submitting
+                          ? null
+                          : (value) =>
+                                setState(() => _startImmediately = value),
+                    ),
+                  ),
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -199,7 +216,10 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
       setState(() => _error = 'GeoNode currently supports HTTP and HTTPS URLs.');
       return;
     }
-    if (_directory.text.trim().isEmpty) {
+    final directory = Platform.isAndroid
+        ? (_directory.text.trim().isEmpty ? 'Downloads' : _directory.text.trim())
+        : _directory.text.trim();
+    if (directory.isEmpty) {
       setState(() => _error = 'Choose a download directory.');
       return;
     }
@@ -213,7 +233,7 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
           .addDownload(
             NewDownload(
               url: url,
-              directory: _directory.text.trim(),
+              directory: directory,
               fileName: _fileName.text.trim(),
               split: _split,
               startImmediately: _startImmediately,

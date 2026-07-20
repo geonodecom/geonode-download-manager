@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../providers.dart';
 import '../services/diagnostics.dart';
 
 class DiagnosticsPage extends ConsumerWidget {
@@ -126,9 +127,10 @@ Future<void> _confirmResetSession(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  final isAndroid = Platform.isAndroid;
   final appDir = await getApplicationSupportDirectory();
   final sessionFile = File(p.join(appDir.path, 'aria2', 'session.txt'));
-  final sessionExists = await sessionFile.exists();
+  final sessionExists = isAndroid ? true : await sessionFile.exists();
 
   if (!context.mounted) return;
 
@@ -138,14 +140,18 @@ Future<void> _confirmResetSession(
       return AlertDialog(
         title: const Text('Reset Session Data'),
         content: Text(
-          sessionExists
+          isAndroid
+              ? 'This will clear Android engine resumable state '
+                  '(partial files and queued native tasks).\n\n'
+                  'This is a development tool.'
+              : sessionExists
               ? 'This will delete the aria2 session file at\n'
-                  '${sessionFile.path}\n\n'
-                  'Active and queued downloads will be lost. '
-                  'This is a development tool.\n'
+                    '${sessionFile.path}\n\n'
+                    'Active and queued downloads will be lost. '
+                    'This is a development tool.\n'
               : 'No aria2 session file was found at\n'
-                  '${sessionFile.path}.\n\n'
-                  'This action has nothing to do.',
+                    '${sessionFile.path}.\n\n'
+                    'This action has nothing to do.',
         ),
         actions: [
           TextButton(
@@ -157,10 +163,11 @@ Future<void> _confirmResetSession(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                foregroundColor:
-                    Theme.of(context).colorScheme.onErrorContainer,
+                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
               ),
-              child: const Text('Delete Session File Only'),
+              child: Text(
+                isAndroid ? 'Reset Engine State' : 'Delete Session File Only',
+              ),
             ),
         ],
       );
@@ -170,28 +177,24 @@ Future<void> _confirmResetSession(
   if (confirmed != true || !context.mounted) return;
 
   try {
-    if (await sessionFile.exists()) {
-      await sessionFile.delete();
-    }
-    ref.read(diagnosticsLogProvider).info(
-          'Deleted aria2 session file.',
-        );
+    await ref.read(downloadServiceProvider).resetEngineSession();
+    ref.read(diagnosticsLogProvider).info('Reset download engine session.');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Session file deleted. Restart GeoNode Download Manager to start fresh.',
+            'Engine session reset. Restart GeoNode Download Manager to start fresh.',
           ),
         ),
       );
     }
   } catch (error) {
-    ref.read(diagnosticsLogProvider).error(
-          'Reset: failed to delete session file: $error',
-        );
+    ref
+        .read(diagnosticsLogProvider)
+        .error('Reset: failed to clear engine session: $error');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete session file: $error')),
+        SnackBar(content: Text('Failed to reset engine session: $error')),
       );
     }
   }

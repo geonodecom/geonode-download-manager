@@ -74,46 +74,64 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
 
   @override
   Widget build(BuildContext context) {
+    final isAndroid = Platform.isAndroid;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        _SectionLabel(label: 'Download'),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _directory,
-                decoration: const InputDecoration(
-                  labelText: 'Download directory',
-                  helperText: 'Existing downloads will not move.',
+        if (!isAndroid) ...[
+          _SectionLabel(label: 'Download'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _directory,
+                  decoration: const InputDecoration(
+                    labelText: 'Download directory',
+                    helperText: 'Existing downloads will not move.',
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.tonal(
-              onPressed: _pickDirectory,
-              child: const Text('Browse'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _SectionLabel(label: 'Engine'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _aria2Path,
-          decoration: const InputDecoration(
-            labelText: 'aria2 executable override',
-            hintText: 'Leave empty to use aria2c from PATH',
-            helperText: 'Requires restarting GeoNode Download Manager to take effect.',
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: _pickDirectory,
+                child: const Text('Browse'),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          _SectionLabel(label: 'Engine'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _aria2Path,
+            decoration: const InputDecoration(
+              labelText: 'aria2 executable override',
+              hintText: 'Leave empty to use aria2c from PATH',
+              helperText:
+                  'Requires restarting GeoNode Download Manager to take effect.',
+            ),
+          ),
+          const SizedBox(height: 16),
+        ] else ...[
+          _SectionLabel(label: 'Download'),
+          const SizedBox(height: 8),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Save location'),
+            subtitle: Text(
+              'Completed files are published to the system Downloads folder.',
+            ),
+          ),
+          const SizedBox(height: 12),
+          _SectionLabel(label: 'Engine'),
+          const SizedBox(height: 8),
+        ],
         DropdownButtonFormField<int>(
           initialValue: _maxActive,
           decoration: const InputDecoration(
             labelText: 'Active downloads',
-            helperText: 'Requires restarting GeoNode Download Manager to take effect.',
+            helperText:
+                'Requires restarting GeoNode Download Manager to take effect.',
           ),
           items: const [1, 2, 3, 4, 5]
               .map(
@@ -128,7 +146,8 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
           initialValue: _split,
           decoration: const InputDecoration(
             labelText: 'Default connections',
-            helperText: 'Requires restarting GeoNode Download Manager to take effect.',
+            helperText:
+                'Requires restarting GeoNode Download Manager to take effect.',
           ),
           items: const [1, 4, 8, 16, 24, 32]
               .map(
@@ -189,62 +208,31 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       _saving = true;
     });
 
-    final directory = _directory.text.trim();
-    final aria2Path = _aria2Path.text.trim();
+    final isAndroid = Platform.isAndroid;
+    final directory = isAndroid
+        ? (widget.settings.downloadDirectory.trim().isEmpty
+              ? 'Downloads'
+              : widget.settings.downloadDirectory.trim())
+        : _directory.text.trim();
+    final aria2Path = isAndroid ? '' : _aria2Path.text.trim();
 
-    // Validate download directory.
-    if (directory.isEmpty) {
-      setState(() {
-        _messages.add(
-          _ValidationMessage.error('Download directory cannot be empty.'),
-        );
-        _saving = false;
-      });
-      return;
-    }
+    if (!isAndroid) {
+      if (directory.isEmpty) {
+        setState(() {
+          _messages.add(
+            _ValidationMessage.error('Download directory cannot be empty.'),
+          );
+          _saving = false;
+        });
+        return;
+      }
 
-    final dir = Directory(directory);
-    if (!await dir.exists()) {
-      setState(() {
-        _messages.add(
-          _ValidationMessage.error(
-            'Download directory "$directory" does not exist.',
-          ),
-        );
-        _saving = false;
-      });
-      return;
-    }
-
-    try {
-      final testFile = File(
-        p.join(
-          dir.path,
-          '.geonode-write-test-${DateTime.now().microsecondsSinceEpoch}',
-        ),
-      );
-      await testFile.writeAsString('ok');
-      await testFile.delete();
-    } catch (_) {
-      setState(() {
-        _messages.add(
-          _ValidationMessage.error(
-            'Cannot write to "$directory". Check permissions.',
-          ),
-        );
-        _saving = false;
-      });
-      return;
-    }
-
-    // Validate aria2 executable path if set manually.
-    if (aria2Path.isNotEmpty) {
-      final ariaFile = File(aria2Path);
-      if (!await ariaFile.exists()) {
+      final dir = Directory(directory);
+      if (!await dir.exists()) {
         setState(() {
           _messages.add(
             _ValidationMessage.error(
-              'aria2 executable was not found at "$aria2Path".',
+              'Download directory "$directory" does not exist.',
             ),
           );
           _saving = false;
@@ -252,14 +240,50 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
         return;
       }
 
-      if (!await isExecutablePath(aria2Path)) {
+      try {
+        final testFile = File(
+          p.join(
+            dir.path,
+            '.geonode-write-test-${DateTime.now().microsecondsSinceEpoch}',
+          ),
+        );
+        await testFile.writeAsString('ok');
+        await testFile.delete();
+      } catch (_) {
         setState(() {
           _messages.add(
-            _ValidationMessage.error('"$aria2Path" is not executable.'),
+            _ValidationMessage.error(
+              'Cannot write to "$directory". Check permissions.',
+            ),
           );
           _saving = false;
         });
         return;
+      }
+
+      if (aria2Path.isNotEmpty) {
+        final ariaFile = File(aria2Path);
+        if (!await ariaFile.exists()) {
+          setState(() {
+            _messages.add(
+              _ValidationMessage.error(
+                'aria2 executable was not found at "$aria2Path".',
+              ),
+            );
+            _saving = false;
+          });
+          return;
+        }
+
+        if (!await isExecutablePath(aria2Path)) {
+          setState(() {
+            _messages.add(
+              _ValidationMessage.error('"$aria2Path" is not executable.'),
+            );
+            _saving = false;
+          });
+          return;
+        }
       }
     }
 
@@ -287,8 +311,9 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     final engineChanged =
         _maxActive != widget.settings.maxActiveDownloads ||
         _split != widget.settings.defaultSplit ||
-        aria2Path != widget.settings.aria2Path ||
-        directory != widget.settings.downloadDirectory;
+        (!isAndroid &&
+            (aria2Path != widget.settings.aria2Path ||
+                directory != widget.settings.downloadDirectory));
 
     setState(() {
       _saving = false;

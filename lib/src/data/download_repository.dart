@@ -263,6 +263,10 @@ class DownloadRepository {
         : existing.completedLength;
     final error = mapped == DownloadStatus.error ? status.errorMessage : null;
     final errorCode = mapped == DownloadStatus.error ? status.errorCode : null;
+    final path = status.files.isEmpty ? null : status.files.first.path;
+    final contentUri = path != null && path.startsWith('content:')
+        ? path
+        : existing.contentUri;
     await (_db.update(
       _db.downloadEntries,
     )..where((row) => row.id.equals(existing.id))).write(
@@ -276,6 +280,8 @@ class DownloadRepository {
         numPieces: Value(status.numPieces),
         bitfield: Value(status.bitfield),
         fileName: Value(status.fileName ?? existing.fileName),
+        displayName: Value(status.fileName ?? existing.displayName),
+        contentUri: Value(contentUri),
         aria2ErrorCode: Value(errorCode),
         error: Value(error),
         updatedAt: Value(DateTime.now()),

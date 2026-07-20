@@ -83,7 +83,15 @@ class _DownloadDetailsContent extends ConsumerWidget {
               ],
               _DetailRow(label: 'URL', value: download.url),
               _DetailRow(label: 'Host', value: host ?? ''),
-              _DetailRow(label: 'Directory', value: download.directory),
+              _DetailRow(
+                label: download.contentUri == null || download.contentUri!.isEmpty
+                    ? 'Directory'
+                    : 'Location',
+                value: (download.contentUri != null &&
+                        download.contentUri!.isNotEmpty)
+                    ? download.contentUri!
+                    : download.directory,
+              ),
               _DetailRow(label: 'File', value: path ?? ''),
               _DetailRow(label: 'Status', value: statusLabel(download.status)),
               _DetailRow(label: 'GID', value: download.gid ?? ''),
@@ -103,7 +111,7 @@ class _DownloadDetailsContent extends ConsumerWidget {
               const SizedBox(height: 8),
               if (pieces.isEmpty)
                 const Text(
-                  'Piece map is available after aria2 starts the transfer.',
+                  'Piece map is available after the download engine starts the transfer.',
                 )
               else ...[
                 Text('$completedPieces / ${pieces.length} pieces complete'),
@@ -134,11 +142,12 @@ class _DownloadDetailsContent extends ConsumerWidget {
           icon: const Icon(Symbols.file_open),
           label: const Text('Open file'),
         ),
-        TextButton.icon(
-          onPressed: () => unawaited(openPath(download.directory)),
-          icon: const Icon(Symbols.folder_open),
-          label: const Text('Open folder'),
-        ),
+        if (download.contentUri == null || download.contentUri!.isEmpty)
+          TextButton.icon(
+            onPressed: () => unawaited(openPath(download.directory)),
+            icon: const Icon(Symbols.folder_open),
+            label: const Text('Open folder'),
+          ),
         if (status == DownloadStatus.active)
           TextButton.icon(
             onPressed: () =>

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/app.dart';
 import 'src/extension/app_extension_bridge.dart';
+import 'src/platform/share_intake.dart';
 import 'src/providers.dart';
 import 'src/services/diagnostics.dart';
 
@@ -45,27 +46,36 @@ class GeonodeApp extends ConsumerStatefulWidget {
 class _GeonodeAppState extends ConsumerState<GeonodeApp>
     with TrayListener, WindowListener {
   AppExtensionBridge? _extensionBridge;
+  final ShareIntake _shareIntake = ShareIntake();
+
+  bool get _isDesktop =>
+      Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
   @override
   void initState() {
     super.initState();
-    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    if (_isDesktop) {
       trayManager.addListener(this);
       windowManager.addListener(this);
-      _setupTray();
+      unawaited(_setupTray());
     }
     if (Platform.isLinux || Platform.isWindows) {
       unawaited(_startExtensionBridge());
+    }
+    if (Platform.isAndroid) {
+      unawaited(_startShareIntake());
+      unawaited(_requestAndroidNotificationPermission());
     }
   }
 
   @override
   void dispose() {
-    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    if (_isDesktop) {
       trayManager.removeListener(this);
       windowManager.removeListener(this);
     }
     unawaited(_extensionBridge?.stop());
+    unawaited(_shareIntake.stop());
     super.dispose();
   }
 
@@ -122,6 +132,25 @@ class _GeonodeAppState extends ConsumerState<GeonodeApp>
       ref
           .read(diagnosticsLogProvider)
           .error('Extension bridge failed to start: $error');
+    }
+  }
+
+  Future<void> _startShareIntake() async {
+    await _shareIntake.start(
+      onCapture: (capture) {
+        ref.read(shellSectionProvider.notifier).select(ShellSection.downloads);
+        ref.read(downloadCaptureQueueProvider.notifier).enqueue(capture);
+      },
+    );
+  }
+
+  Future<void> _requestAndroidNotificationPermission() async {
+    try {
+      await const MethodChannel(
+        'com.fhsinchy.geonode_download_manager/engine',
+      ).invokeMethod<void>('requestNotificationPermission');
+    } catch (_) {
+      // Optional on older Android versions.
     }
   }
 

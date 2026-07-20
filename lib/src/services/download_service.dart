@@ -6,25 +6,25 @@ import 'package:path/path.dart' as p;
 
 import '../aria2/aria2_client.dart';
 import '../aria2/aria2_models.dart';
-import '../aria2/aria2_process_manager.dart';
 import '../data/app_database.dart';
 import '../data/download_repository.dart';
+import '../engine/download_engine.dart';
 import 'diagnostics.dart';
 import 'download_probe.dart';
 
 class DownloadService {
   DownloadService({
     required DownloadRepository repository,
-    required Aria2ProcessManager processManager,
+    required DownloadEngine engine,
     DiagnosticsLog? diagnostics,
     DownloadProbe? probe,
   }) : _repository = repository,
-       _processManager = processManager,
+       _engine = engine,
        _diagnostics = diagnostics,
        _probe = probe ?? DownloadProbe();
 
   final DownloadRepository _repository;
-  final Aria2ProcessManager _processManager;
+  final DownloadEngine _engine;
   final DiagnosticsLog? _diagnostics;
   final DownloadProbe _probe;
 
@@ -33,21 +33,23 @@ class DownloadService {
   bool _refreshing = false;
   final Set<String> _metadataProbeAttempts = {};
 
+  DownloadEngine get engine => _engine;
+
   Future<void> start() async {
-    if (_started && await _processManager.isHealthy) {
+    if (_started && await _engine.isHealthy) {
       await _fillQueuedMetadata();
       return;
     }
 
     final settings = await _repository.getSettings();
-    _diagnostics?.info('Starting aria2 process…');
-    await _processManager.start(
+    _diagnostics?.info('Starting download engine…');
+    await _engine.start(
       downloadDirectory: settings.downloadDirectory,
       maxActiveDownloads: settings.maxActiveDownloads,
       defaultSplit: settings.defaultSplit,
       executableOverride: settings.aria2Path,
     );
-    _diagnostics?.info('aria2 process started and RPC is ready.');
+    _diagnostics?.info('Download engine started.');
     _started = true;
     _pollTimer ??= Timer.periodic(
       const Duration(seconds: 1),
@@ -86,7 +88,7 @@ class DownloadService {
     if (entity == null) return;
     _diagnostics?.info('Pausing download: ${entity.fileName ?? entity.url}');
     if (entity.gid != null) {
-      await _processManager.client().pause(entity.gid!);
+      await _engine.pause(entity.gid!);
     }
     await _repository.updateStatus(id, DownloadStatus.paused);
   }
@@ -97,7 +99,7 @@ class DownloadService {
     if (entity == null) return;
     _diagnostics?.info('Resuming download: ${entity.fileName ?? entity.url}');
     if (entity.gid != null) {
-      await _processManager.client().unpause(entity.gid!);
+      await _engine.unpause(entity.gid!);
       await _repository.updateStatus(id, DownloadStatus.active);
     } else {
       await _repository.updateStatus(id, DownloadStatus.queued);
@@ -122,7 +124,7 @@ class DownloadService {
     );
     if (entity?.gid != null) {
       try {
-        await _processManager.client().remove(entity!.gid!);
+        await _engine.remove(entity!.gid!);
       } catch (_) {}
     }
 
@@ -174,12 +176,12 @@ class DownloadService {
     final queued = await _repository.listByStatuses({DownloadStatus.queued});
     for (var i = 0; i < queued.length; i++) {
       final gid = queued[i].gid;
-      if (gid != null) await _processManager.client().changePosition(gid, i);
+      if (gid != null) await _engine.changePosition(gid, i);
     }
   }
 
   Future<void> refresh() async {
-    if (_started && !await _processManager.isHealthy) {
+    if (_started && !await _engine.isHealthy) {
       _started = false;
       await start();
       return;
@@ -194,6 +196,8 @@ class DownloadService {
     }
   }
 
+  Future<void> resetEngineSession() => _engine.resetSession();
+
   Future<void> _refreshSafely() async {
     try {
       await refresh();
@@ -204,21 +208,20 @@ class DownloadService {
   }
 
   Future<void> _refresh() async {
-    final client = _processManager.client();
     final statuses = <Aria2Status>[
-      ...await client.tellActive(),
-      ...await client.tellWaiting(),
-      ...await client.tellStopped(),
+      ...await _engine.tellActive(),
+      ...await _engine.tellWaiting(),
+      ...await _engine.tellStopped(),
     ];
     for (final status in statuses) {
       final updated = await _repository.updateFromAria2(status);
-      if (!updated) await _handleUnmatchedAria2Status(status);
+      if (!updated) await _handleUnmatchedEngineStatus(status);
     }
     await _fillQueuedMetadata();
     await resumeQueued();
   }
 
-  Future<void> _handleUnmatchedAria2Status(Aria2Status status) async {
+  Future<void> _handleUnmatchedEngineStatus(Aria2Status status) async {
     if (status.status == 'active') {
       await _repository.attachStatusToMatchingDownload(status);
     } else if (status.status == 'waiting') {
@@ -249,18 +252,18 @@ class DownloadService {
     if (existing == null || existing.gid == status.gid) return;
     if (existing.status != DownloadStatus.active.name) return;
     _diagnostics?.warn(
-      'Removing duplicate aria2 queue entry ${status.gid} '
+      'Removing duplicate engine queue entry ${status.gid} '
       'for ${existing.url}',
     );
     try {
-      await _processManager.client().remove(status.gid);
+      await _engine.remove(status.gid);
       stderr.writeln(
-        '[geonode] removed duplicate aria2 queue entry ${status.gid} for ${existing.url}',
+        '[geonode] removed duplicate engine queue entry ${status.gid} for ${existing.url}',
       );
     } catch (error) {
       _diagnostics?.error('Failed to remove duplicate ${status.gid}: $error');
       stderr.writeln(
-        '[geonode] failed to remove duplicate aria2 queue entry ${status.gid}: $error',
+        '[geonode] failed to remove duplicate engine queue entry ${status.gid}: $error',
       );
     }
   }
@@ -269,7 +272,7 @@ class DownloadService {
     _diagnostics?.info('Shutting down…');
     _pollTimer?.cancel();
     _pollTimer = null;
-    await _processManager.shutdown();
+    await _engine.shutdown();
     _started = false;
     _diagnostics?.info('Shutdown complete.');
   }
@@ -281,26 +284,26 @@ class DownloadService {
   Future<void> _startEntity(DownloadEntity entity) async {
     try {
       if (entity.gid != null) {
-        final status = await _processManager.client().tellStatus(entity.gid!);
+        final status = await _engine.tellStatus(entity.gid!);
         await _repository.updateFromAria2(status);
         return;
       }
 
-      final gid = await _processManager.client().addUri(
+      final gid = await _engine.addUri(
         url: entity.url,
         directory: entity.directory,
         split: entity.split,
         fileName: entity.fileName,
         headers: _headersFor(entity),
       );
-      _diagnostics?.info('Download added to aria2: ${entity.url} → gid $gid');
-      stderr.writeln('[geonode] queued ${entity.url} as aria2 gid $gid');
+      _diagnostics?.info('Download queued: ${entity.url} → gid $gid');
+      stderr.writeln('[geonode] queued ${entity.url} as engine gid $gid');
       await _repository.attachGid(entity.id, gid);
-      final status = await _processManager.client().tellStatus(gid);
+      final status = await _engine.tellStatus(gid);
       await _repository.updateFromAria2(status);
     } catch (error) {
-      _diagnostics?.error('Failed to add ${entity.url} to aria2: $error');
-      stderr.writeln('[geonode] failed to add ${entity.url} to aria2: $error');
+      _diagnostics?.error('Failed to add ${entity.url}: $error');
+      stderr.writeln('[geonode] failed to add ${entity.url}: $error');
       final aria2Code = error is Aria2Exception ? error.code : null;
       await _repository.updateStatus(
         entity.id,
@@ -313,12 +316,19 @@ class DownloadService {
   }
 
   Future<void> _deleteDownloadedFiles(DownloadEntity entity) async {
+    final contentUri = entity.contentUri;
+    if (contentUri != null && contentUri.isNotEmpty) {
+      // Android MediaStore cleanup is handled by the native engine remove path.
+      return;
+    }
+
     final fileName = entity.fileName ?? _fileNameFromUrl(entity.url);
     if (fileName == null || fileName.trim().isEmpty) return;
 
     final file = File(p.join(entity.directory, fileName));
     await _deleteIfExists(file);
     await _deleteIfExists(File('${file.path}.aria2'));
+    await _deleteIfExists(File('${file.path}.part'));
   }
 
   Future<void> _deleteIfExists(File file) async {

@@ -21,6 +21,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _lastAddRequest = 0;
   bool _captureDialogOpen = false;
 
+  static const _destinations = [
+    (Symbols.download, 'Downloads'),
+    (Symbols.low_priority, 'Queue'),
+    (Symbols.history, 'History'),
+    (Symbols.settings, 'Settings'),
+    (Symbols.monitoring, 'Diagnostics'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     ref.listen(addDownloadRequestProvider, (previous, next) {
@@ -37,57 +45,68 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     final startup = ref.watch(startupProvider);
     final section = ref.watch(shellSectionProvider);
+    final width = MediaQuery.sizeOf(context).width;
+    final useRail = width >= 720;
+
+    final body = startup.when(
+      data: (_) => _pageFor(section),
+      loading: () => const _StartupMessage(
+        title: 'Starting download engine',
+        message: 'GeoNode is preparing the local download engine.',
+      ),
+      error: (error, _) => _StartupMessage(
+        title: 'GeoNode could not start',
+        message: error.toString(),
+      ),
+    );
 
     return Scaffold(
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: section.index,
-            labelType: NavigationRailLabelType.all,
-            onDestinationSelected: (index) {
-              ref
-                  .read(shellSectionProvider.notifier)
-                  .select(ShellSection.values[index]);
-            },
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Symbols.download),
-                label: Text('Downloads'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Symbols.low_priority),
-                label: Text('Queue'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Symbols.history),
-                label: Text('History'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Symbols.settings),
-                label: Text('Settings'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Symbols.monitoring),
-                label: Text('Diagnostics'),
-              ),
-            ],
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: startup.when(
-              data: (_) => _pageFor(section),
-              loading: () => const _StartupMessage(
-                title: 'Starting aria2',
-                message: 'GeoNode is preparing the local download engine.',
-              ),
-              error: (error, _) => _StartupMessage(
-                title: 'GeoNode could not start',
-                message: error.toString(),
-              ),
+      appBar: useRail
+          ? null
+          : AppBar(
+              title: Text(_destinations[section.index].$2),
             ),
-          ),
-        ],
-      ),
+      body: useRail
+          ? Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: section.index,
+                  labelType: NavigationRailLabelType.all,
+                  onDestinationSelected: (index) {
+                    ref
+                        .read(shellSectionProvider.notifier)
+                        .select(ShellSection.values[index]);
+                  },
+                  destinations: [
+                    for (final destination in _destinations)
+                      NavigationRailDestination(
+                        icon: Icon(destination.$1),
+                        label: Text(destination.$2),
+                      ),
+                  ],
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: body),
+              ],
+            )
+          : body,
+      bottomNavigationBar: useRail
+          ? null
+          : NavigationBar(
+              selectedIndex: section.index,
+              onDestinationSelected: (index) {
+                ref
+                    .read(shellSectionProvider.notifier)
+                    .select(ShellSection.values[index]);
+              },
+              destinations: [
+                for (final destination in _destinations)
+                  NavigationDestination(
+                    icon: Icon(destination.$1),
+                    label: destination.$2,
+                  ),
+              ],
+            ),
       floatingActionButton: section == ShellSection.downloads
           ? FloatingActionButton.extended(
               onPressed: () => showAddDownloadDialog(context),
@@ -133,14 +152,17 @@ class _StartupMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-          ],
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+            ],
+          ),
         ),
       ),
     );

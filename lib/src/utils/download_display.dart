@@ -16,6 +16,8 @@ String? sourceHost(String url) {
 }
 
 String? outputPath(DownloadEntity download) {
+  final contentUri = download.contentUri?.trim();
+  if (contentUri != null && contentUri.isNotEmpty) return contentUri;
   final fileName = download.fileName?.trim();
   if (fileName == null || fileName.isEmpty) return null;
   return p.join(download.directory, fileName);

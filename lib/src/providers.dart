@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'aria2/aria2_process_manager.dart';
 import 'data/app_database.dart';
 import 'data/download_repository.dart';
+import 'engine/android_download_engine.dart';
+import 'engine/aria2_download_engine.dart';
+import 'engine/download_engine.dart';
 import 'extension/download_capture.dart';
 import 'services/diagnostics.dart';
 import 'services/download_service.dart';
@@ -68,14 +72,18 @@ final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   return DownloadRepository(ref.watch(databaseProvider));
 });
 
-final aria2ProcessManagerProvider = Provider<Aria2ProcessManager>((ref) {
-  return Aria2ProcessManager(diagnostics: ref.watch(diagnosticsLogProvider));
+final downloadEngineProvider = Provider<DownloadEngine>((ref) {
+  final diagnostics = ref.watch(diagnosticsLogProvider);
+  if (Platform.isAndroid) {
+    return AndroidDownloadEngine();
+  }
+  return Aria2DownloadEngine(diagnostics: diagnostics);
 });
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {
   final service = DownloadService(
     repository: ref.watch(downloadRepositoryProvider),
-    processManager: ref.watch(aria2ProcessManagerProvider),
+    engine: ref.watch(downloadEngineProvider),
     diagnostics: ref.watch(diagnosticsLogProvider),
   );
   ref.onDispose(service.dispose);
