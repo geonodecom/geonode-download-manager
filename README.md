@@ -10,21 +10,42 @@ service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
 
 The app focuses on direct HTTP/HTTPS file downloads, queueing, resume, and useful
-download details. Streaming-page extraction (for example YouTube watch pages) is
-out of scope.
+download details. Site extractors (for example YouTube watch pages) and torrent
+downloads are not implemented yet; see [Roadmap](#roadmap).
 
 ## Features
 
-- Material 3 UI (desktop navigation rail; phone bottom navigation)
-- Desktop: local aria2 process managed by the app
-- Android: foreground download service with progress notifications
-- One-active-download queue by default (configurable)
-- Pause, resume, retry, remove, and reorder
-- SQLite-backed history, queue, and settings
-- Download details with piece map
-- Desktop system tray integration
-- Chromium extension handoff through a native messaging host (desktop)
-- Android share / open-with intake for direct HTTP(S) URLs
+- [x] Material 3 UI (desktop navigation rail; phone bottom navigation)
+- [x] Desktop: local aria2 process managed by the app
+- [x] Android: foreground download service with progress notifications
+- [x] One-active-download queue by default (configurable)
+- [x] Pause, resume, retry, remove, and reorder
+- [x] SQLite-backed history, queue, and settings
+- [x] Download details with piece map
+- [x] Desktop system tray integration
+- [x] Chromium extension handoff through a native messaging host (desktop)
+- [x] Android share / open-with intake for direct HTTP(S) URLs
+
+## Roadmap
+
+Planned work (not shipped):
+
+- [ ] Video site download (YouTube, Dailymotion, Facebook)
+- [ ] Torrent / magnet support
+- [ ] Signed Play Store releases (production keystore in CI)
+- [ ] Automated Linux and Windows release artifacts in CI
+
+## Releasing
+
+Push a commit to `main` whose message contains a semver marker:
+
+```text
+RELEASE 0.2.0
+```
+
+That triggers the GitHub Actions release workflow, which builds a release Android
+APK, creates tag `v0.2.0`, and publishes a GitHub Release with the APK attached.
+Linux and Windows builds remain manual for now (see [Build](#build)).
 
 ## Requirements
 
