@@ -13,6 +13,8 @@ class DownloadEntries extends Table {
   TextColumn get url => text()();
   TextColumn get fileName => text().nullable()();
   TextColumn get directory => text()();
+  TextColumn get contentUri => text().nullable()();
+  TextColumn get displayName => text().nullable()();
   TextColumn get status => text()();
   IntColumn get queuePosition => integer()();
   IntColumn get totalLength => integer().withDefault(const Constant(0))();
@@ -49,7 +51,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -59,6 +61,13 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(
             downloadEntries,
             downloadEntries.aria2ErrorCode,
+          );
+        }
+        if (from < 3) {
+          await migrator.addColumn(downloadEntries, downloadEntries.contentUri);
+          await migrator.addColumn(
+            downloadEntries,
+            downloadEntries.displayName,
           );
         }
       },

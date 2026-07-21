@@ -58,6 +58,28 @@ class $DownloadEntriesTable extends DownloadEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _contentUriMeta = const VerificationMeta(
+    'contentUri',
+  );
+  @override
+  late final GeneratedColumn<String> contentUri = GeneratedColumn<String>(
+    'content_uri',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -252,6 +274,8 @@ class $DownloadEntriesTable extends DownloadEntries
     url,
     fileName,
     directory,
+    contentUri,
+    displayName,
     status,
     queuePosition,
     totalLength,
@@ -314,6 +338,21 @@ class $DownloadEntriesTable extends DownloadEntries
       );
     } else if (isInserting) {
       context.missing(_directoryMeta);
+    }
+    if (data.containsKey('content_uri')) {
+      context.handle(
+        _contentUriMeta,
+        contentUri.isAcceptableOrUnknown(data['content_uri']!, _contentUriMeta),
+      );
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
     }
     if (data.containsKey('status')) {
       context.handle(
@@ -481,6 +520,14 @@ class $DownloadEntriesTable extends DownloadEntries
         DriftSqlType.string,
         data['${effectivePrefix}directory'],
       )!,
+      contentUri: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_uri'],
+      ),
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      ),
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -564,6 +611,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
   final String url;
   final String? fileName;
   final String directory;
+  final String? contentUri;
+  final String? displayName;
   final String status;
   final int queuePosition;
   final int totalLength;
@@ -587,6 +636,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
     required this.url,
     this.fileName,
     required this.directory,
+    this.contentUri,
+    this.displayName,
     required this.status,
     required this.queuePosition,
     required this.totalLength,
@@ -617,6 +668,12 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
       map['file_name'] = Variable<String>(fileName);
     }
     map['directory'] = Variable<String>(directory);
+    if (!nullToAbsent || contentUri != null) {
+      map['content_uri'] = Variable<String>(contentUri);
+    }
+    if (!nullToAbsent || displayName != null) {
+      map['display_name'] = Variable<String>(displayName);
+    }
     map['status'] = Variable<String>(status);
     map['queue_position'] = Variable<int>(queuePosition);
     map['total_length'] = Variable<int>(totalLength);
@@ -656,6 +713,12 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
           ? const Value.absent()
           : Value(fileName),
       directory: Value(directory),
+      contentUri: contentUri == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentUri),
+      displayName: displayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(displayName),
       status: Value(status),
       queuePosition: Value(queuePosition),
       totalLength: Value(totalLength),
@@ -697,6 +760,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
       url: serializer.fromJson<String>(json['url']),
       fileName: serializer.fromJson<String?>(json['fileName']),
       directory: serializer.fromJson<String>(json['directory']),
+      contentUri: serializer.fromJson<String?>(json['contentUri']),
+      displayName: serializer.fromJson<String?>(json['displayName']),
       status: serializer.fromJson<String>(json['status']),
       queuePosition: serializer.fromJson<int>(json['queuePosition']),
       totalLength: serializer.fromJson<int>(json['totalLength']),
@@ -725,6 +790,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
       'url': serializer.toJson<String>(url),
       'fileName': serializer.toJson<String?>(fileName),
       'directory': serializer.toJson<String>(directory),
+      'contentUri': serializer.toJson<String?>(contentUri),
+      'displayName': serializer.toJson<String?>(displayName),
       'status': serializer.toJson<String>(status),
       'queuePosition': serializer.toJson<int>(queuePosition),
       'totalLength': serializer.toJson<int>(totalLength),
@@ -751,6 +818,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
     String? url,
     Value<String?> fileName = const Value.absent(),
     String? directory,
+    Value<String?> contentUri = const Value.absent(),
+    Value<String?> displayName = const Value.absent(),
     String? status,
     int? queuePosition,
     int? totalLength,
@@ -774,6 +843,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
     url: url ?? this.url,
     fileName: fileName.present ? fileName.value : this.fileName,
     directory: directory ?? this.directory,
+    contentUri: contentUri.present ? contentUri.value : this.contentUri,
+    displayName: displayName.present ? displayName.value : this.displayName,
     status: status ?? this.status,
     queuePosition: queuePosition ?? this.queuePosition,
     totalLength: totalLength ?? this.totalLength,
@@ -801,6 +872,12 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
       url: data.url.present ? data.url.value : this.url,
       fileName: data.fileName.present ? data.fileName.value : this.fileName,
       directory: data.directory.present ? data.directory.value : this.directory,
+      contentUri: data.contentUri.present
+          ? data.contentUri.value
+          : this.contentUri,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
       status: data.status.present ? data.status.value : this.status,
       queuePosition: data.queuePosition.present
           ? data.queuePosition.value
@@ -847,6 +924,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
           ..write('url: $url, ')
           ..write('fileName: $fileName, ')
           ..write('directory: $directory, ')
+          ..write('contentUri: $contentUri, ')
+          ..write('displayName: $displayName, ')
           ..write('status: $status, ')
           ..write('queuePosition: $queuePosition, ')
           ..write('totalLength: $totalLength, ')
@@ -875,6 +954,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
     url,
     fileName,
     directory,
+    contentUri,
+    displayName,
     status,
     queuePosition,
     totalLength,
@@ -902,6 +983,8 @@ class DownloadEntity extends DataClass implements Insertable<DownloadEntity> {
           other.url == this.url &&
           other.fileName == this.fileName &&
           other.directory == this.directory &&
+          other.contentUri == this.contentUri &&
+          other.displayName == this.displayName &&
           other.status == this.status &&
           other.queuePosition == this.queuePosition &&
           other.totalLength == this.totalLength &&
@@ -927,6 +1010,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
   final Value<String> url;
   final Value<String?> fileName;
   final Value<String> directory;
+  final Value<String?> contentUri;
+  final Value<String?> displayName;
   final Value<String> status;
   final Value<int> queuePosition;
   final Value<int> totalLength;
@@ -951,6 +1036,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
     this.url = const Value.absent(),
     this.fileName = const Value.absent(),
     this.directory = const Value.absent(),
+    this.contentUri = const Value.absent(),
+    this.displayName = const Value.absent(),
     this.status = const Value.absent(),
     this.queuePosition = const Value.absent(),
     this.totalLength = const Value.absent(),
@@ -976,6 +1063,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
     required String url,
     this.fileName = const Value.absent(),
     required String directory,
+    this.contentUri = const Value.absent(),
+    this.displayName = const Value.absent(),
     required String status,
     required int queuePosition,
     this.totalLength = const Value.absent(),
@@ -1007,6 +1096,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
     Expression<String>? url,
     Expression<String>? fileName,
     Expression<String>? directory,
+    Expression<String>? contentUri,
+    Expression<String>? displayName,
     Expression<String>? status,
     Expression<int>? queuePosition,
     Expression<int>? totalLength,
@@ -1032,6 +1123,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
       if (url != null) 'url': url,
       if (fileName != null) 'file_name': fileName,
       if (directory != null) 'directory': directory,
+      if (contentUri != null) 'content_uri': contentUri,
+      if (displayName != null) 'display_name': displayName,
       if (status != null) 'status': status,
       if (queuePosition != null) 'queue_position': queuePosition,
       if (totalLength != null) 'total_length': totalLength,
@@ -1059,6 +1152,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
     Value<String>? url,
     Value<String?>? fileName,
     Value<String>? directory,
+    Value<String?>? contentUri,
+    Value<String?>? displayName,
     Value<String>? status,
     Value<int>? queuePosition,
     Value<int>? totalLength,
@@ -1084,6 +1179,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
       url: url ?? this.url,
       fileName: fileName ?? this.fileName,
       directory: directory ?? this.directory,
+      contentUri: contentUri ?? this.contentUri,
+      displayName: displayName ?? this.displayName,
       status: status ?? this.status,
       queuePosition: queuePosition ?? this.queuePosition,
       totalLength: totalLength ?? this.totalLength,
@@ -1122,6 +1219,12 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
     }
     if (directory.present) {
       map['directory'] = Variable<String>(directory.value);
+    }
+    if (contentUri.present) {
+      map['content_uri'] = Variable<String>(contentUri.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -1188,6 +1291,8 @@ class DownloadEntriesCompanion extends UpdateCompanion<DownloadEntity> {
           ..write('url: $url, ')
           ..write('fileName: $fileName, ')
           ..write('directory: $directory, ')
+          ..write('contentUri: $contentUri, ')
+          ..write('displayName: $displayName, ')
           ..write('status: $status, ')
           ..write('queuePosition: $queuePosition, ')
           ..write('totalLength: $totalLength, ')
@@ -1443,6 +1548,8 @@ typedef $$DownloadEntriesTableCreateCompanionBuilder =
       required String url,
       Value<String?> fileName,
       required String directory,
+      Value<String?> contentUri,
+      Value<String?> displayName,
       required String status,
       required int queuePosition,
       Value<int> totalLength,
@@ -1469,6 +1576,8 @@ typedef $$DownloadEntriesTableUpdateCompanionBuilder =
       Value<String> url,
       Value<String?> fileName,
       Value<String> directory,
+      Value<String?> contentUri,
+      Value<String?> displayName,
       Value<String> status,
       Value<int> queuePosition,
       Value<int> totalLength,
@@ -1520,6 +1629,16 @@ class $$DownloadEntriesTableFilterComposer
 
   ColumnFilters<String> get directory => $composableBuilder(
     column: $table.directory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentUri => $composableBuilder(
+    column: $table.contentUri,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1643,6 +1762,16 @@ class $$DownloadEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get contentUri => $composableBuilder(
+    column: $table.contentUri,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -1752,6 +1881,16 @@ class $$DownloadEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get directory =>
       $composableBuilder(column: $table.directory, builder: (column) => column);
+
+  GeneratedColumn<String> get contentUri => $composableBuilder(
+    column: $table.contentUri,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -1865,6 +2004,8 @@ class $$DownloadEntriesTableTableManager
                 Value<String> url = const Value.absent(),
                 Value<String?> fileName = const Value.absent(),
                 Value<String> directory = const Value.absent(),
+                Value<String?> contentUri = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> queuePosition = const Value.absent(),
                 Value<int> totalLength = const Value.absent(),
@@ -1889,6 +2030,8 @@ class $$DownloadEntriesTableTableManager
                 url: url,
                 fileName: fileName,
                 directory: directory,
+                contentUri: contentUri,
+                displayName: displayName,
                 status: status,
                 queuePosition: queuePosition,
                 totalLength: totalLength,
@@ -1915,6 +2058,8 @@ class $$DownloadEntriesTableTableManager
                 required String url,
                 Value<String?> fileName = const Value.absent(),
                 required String directory,
+                Value<String?> contentUri = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
                 required String status,
                 required int queuePosition,
                 Value<int> totalLength = const Value.absent(),
@@ -1939,6 +2084,8 @@ class $$DownloadEntriesTableTableManager
                 url: url,
                 fileName: fileName,
                 directory: directory,
+                contentUri: contentUri,
+                displayName: displayName,
                 status: status,
                 queuePosition: queuePosition,
                 totalLength: totalLength,

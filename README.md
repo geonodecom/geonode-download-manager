@@ -1,23 +1,51 @@
 <p align="center">
-  <strong>Fast, opinionated download manager powered by aria2.</strong>
+  <strong>Fast, opinionated download manager for desktop and Android.</strong>
 </p>
 
 ## Status
 
-GeoNode Download Manager is a Linux-first Flutter desktop app with Windows support. The app uses
-system `aria2c` as its download engine and focuses on fast segmented downloads,
-simple queueing, robust resume, and useful download details.
+GeoNode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
+targets. Desktop builds use system `aria2c`. Android uses a native foreground
+service with segmented HTTP Range downloads and publishes completed files to the
+system Downloads collection via MediaStore.
+
+The app focuses on direct HTTP/HTTPS file downloads, queueing, resume, and useful
+download details. Site extractors (for example YouTube watch pages) and torrent
+downloads are not implemented yet; see [Roadmap](#roadmap).
 
 ## Features
 
-- Material 3 Flutter desktop UI
-- Local aria2 process managed by GeoNode Download Manager
-- One-active-download queue by default
-- Pause, resume, retry, remove, and reorder
-- SQLite-backed history, queue, and settings
-- Download details with aria2 piece map
-- System tray integration
-- Chromium extension handoff through a native messaging host
+- [x] Material 3 UI (desktop navigation rail; phone bottom navigation)
+- [x] Desktop: local aria2 process managed by the app
+- [x] Android: foreground download service with progress notifications
+- [x] One-active-download queue by default (configurable)
+- [x] Pause, resume, retry, remove, and reorder
+- [x] SQLite-backed history, queue, and settings
+- [x] Download details with piece map
+- [x] Desktop system tray integration
+- [x] Chromium extension handoff through a native messaging host (desktop)
+- [x] Android share / open-with intake for direct HTTP(S) URLs
+
+## Roadmap
+
+Planned work (not shipped):
+
+- [ ] Video site download (YouTube, Dailymotion, Facebook)
+- [ ] Torrent / magnet support
+- [ ] Signed Play Store releases (production keystore in CI)
+- [ ] Automated Linux and Windows release artifacts in CI
+
+## Releasing
+
+Push a commit to `main` whose message contains a semver marker:
+
+```text
+RELEASE 0.2.0
+```
+
+That triggers the GitHub Actions release workflow, which builds a release Android
+APK, creates tag `v0.2.0`, and publishes a GitHub Release with the APK attached.
+Linux and Windows builds remain manual for now (see [Build](#build)).
 
 ## Requirements
 
@@ -25,10 +53,10 @@ simple queueing, robust resume, and useful download details.
 
 - Flutter 3.41+
 - Dart 3.11+
-- `aria2c` 1.37+ on `PATH` (or set a custom path in Settings)
 
 ### Linux
 
+- `aria2c` 1.37+ on `PATH` (or set a custom path in Settings)
 - Linux desktop build dependencies for Flutter
 - AppIndicator/Ayatana development headers for tray support
 - `lld-21` or another linker available next to `clang++`
@@ -50,6 +78,17 @@ sudo dnf install aria2 clang cmake ninja-build pkgconf-pkg-config gtk3-devel lib
 - [Visual Studio](https://visualstudio.microsoft.com/) with the **Desktop development with C++** workload
 - Windows Developer Mode enabled (Flutter plugin symlinks), or equivalent symlink privilege
 - `aria2c.exe` on `PATH` (for example via [Scoop](https://scoop.sh/) `scoop install aria2` or [Chocolatey](https://chocolatey.org/) `choco install aria2`)
+
+### Android
+
+- Android SDK with cmdline-tools, platform-tools, and a recent platform (API 35+)
+- Accepted Android SDK licenses (`flutter doctor --android-licenses`)
+- Emulator or physical device with USB debugging
+- Notification permission on Android 13+ (requested at launch)
+
+Android does **not** require system `aria2c`. Downloads run in
+`DownloadForegroundService` and finished files appear in the public Downloads
+folder.
 
 ## Development
 
@@ -84,7 +123,22 @@ make run-debug-bundle
 flutter run -d windows
 ```
 
+### Android
+
+```powershell
+flutter devices
+flutter run -d <android-device-id>
+```
+
+Optional smoke harness:
+
+```powershell
+flutter test integration_test/android_smoke_test.dart -d <android-device-id>
+```
+
 ## Chromium Extension
+
+Desktop only. Android uses share / view intents instead.
 
 ### Linux
 
@@ -133,6 +187,29 @@ powershell -File tool/windows/build.ps1
 The release bundle is written to `build/windows/x64/runner/Release/`.
 `build/geonode-download-manager-host.exe` is produced for native messaging.
 
+### Android
+
+```powershell
+flutter build apk --release
+flutter build appbundle --release
+```
+
+Outputs:
+
+- APK: `build/app/outputs/flutter-apk/app-release.apk`
+- App Bundle: `build/app/outputs/bundle/release/app-release.aab`
+
+Release builds currently sign with the debug keystore so local install works.
+Replace `signingConfig` in `android/app/build.gradle.kts` with your Play Store
+keystore before publishing.
+
+### Play Store notes
+
+- Declare the `dataSync` foreground service for active downloads.
+- Request `POST_NOTIFICATIONS` on Android 13+.
+- Disclose background/foreground download behavior in the Play Console data-safety form.
+- Direct HTTP(S) file downloads only; do not claim YouTube/streaming extraction support.
+
 ## Install Locally
 
 ### Linux
@@ -170,6 +247,16 @@ To uninstall:
 
 ```powershell
 powershell -File tool/windows/uninstall.ps1
+```
+
+### Android
+
+Install a debug/release APK on a connected device:
+
+```powershell
+flutter install -d <android-device-id>
+# or
+adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ## License
