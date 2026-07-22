@@ -96,7 +96,7 @@ jobs:
           $ndk = Join-Path $env:ANDROID_HOME "ndk/28.2.13676358"
           if (-not (Test-Path $ndk)) { throw "NDK missing at $ndk" }
           $env:ANDROID_NDK_HOME = $ndk
-          & powershell -ExecutionPolicy Bypass -File tool/android/fetch_deps.ps1
+          & ./tool/android/fetch_deps.ps1
 
       - name: Build Android APK
         run: flutter build apk --release
