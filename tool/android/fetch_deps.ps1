@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$Root = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $VersionsFile = Join-Path $Root "tool/deps/versions.json"
 $Versions = Get-Content -Raw $VersionsFile | ConvertFrom-Json
 $Android = $Versions.android
@@ -19,7 +19,8 @@ $AbiToNdkTriple = @{
     "x86_64"      = "x86_64-linux-android"
 }
 
-$Temp = Join-Path $env:TEMP "geonode-deps-android"
+$TempRoot = [System.IO.Path]::GetTempPath().TrimEnd('\', '/')
+$Temp = Join-Path $TempRoot "geonode-deps-android"
 if (Test-Path $Temp) { Remove-Item -Recurse -Force $Temp }
 New-Item -ItemType Directory -Force -Path $Temp | Out-Null
 
