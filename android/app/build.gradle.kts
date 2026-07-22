@@ -27,6 +27,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Extract jniLibs so libffmpeg.so is executable from nativeLibraryDir.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {

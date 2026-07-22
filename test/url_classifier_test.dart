@@ -91,6 +91,33 @@ void main() {
       );
     });
 
+    test('watch with list but no video id is not a playlist', () {
+      expect(
+        UrlClassifier.classify(
+          'https://www.youtube.com/watch?list=RDUdsO4SM4wKI&index=9',
+        ),
+        DownloadUrlKind.direct,
+      );
+    });
+
+    test('normalizeYoutubeUrl strips list params to canonical watch url', () {
+      expect(
+        UrlClassifier.normalizeYoutubeUrl(
+          'https://www.youtube.com/watch?v=YyepU5ztLf4&list=RDUdsO4SM4wKI&index=9',
+        ),
+        'https://www.youtube.com/watch?v=YyepU5ztLf4',
+      );
+    });
+
+    test('normalizeInputUrl strips zero-width characters', () {
+      expect(
+        UrlClassifier.normalizeInputUrl(
+          '\uFEFFhttps://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        ),
+        'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      );
+    });
+
     test('normalizeYoutubeUrl returns canonical watch url', () {
       expect(
         UrlClassifier.normalizeYoutubeUrl(

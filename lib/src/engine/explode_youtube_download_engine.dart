@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -7,6 +8,8 @@ import 'package:uuid/uuid.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../aria2/aria2_models.dart';
+import '../ytdlp/android_ffmpeg.dart';
+import '../ytdlp/youtube_format_id.dart';
 import '../ytdlp/ytdlp_models.dart';
 import 'download_engine.dart';
 
@@ -33,6 +36,7 @@ class _ExplodeJob {
   String? errorMessage;
   String? contentUri;
   var cancelRequested = false;
+  Process? ffmpegProcess;
   DateTime? _speedSampleAt;
   int _speedSampleBytes = 0;
 }
@@ -41,10 +45,13 @@ class _ExplodeJob {
 class ExplodeYoutubeDownloadEngine implements DownloadEngine {
   ExplodeYoutubeDownloadEngine({
     Future<String?> Function(String sourcePath, String displayName)? publishFile,
-  }) : _publishFile = publishFile ?? _defaultPublishFile;
+    Future<String> Function()? resolveFfmpeg,
+  }) : _publishFile = publishFile ?? _defaultPublishFile,
+       _resolveFfmpeg = resolveFfmpeg ?? resolveAndroidFfmpegPath;
 
   final Future<String?> Function(String sourcePath, String displayName)
   _publishFile;
+  final Future<String> Function() _resolveFfmpeg;
   final Map<String, _ExplodeJob> _jobs = {};
   var _started = false;
   String _downloadDirectory = '';
@@ -90,8 +97,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
   @override
   Future<void> shutdown() async {
     for (final job in _jobs.values.toList()) {
-      job.cancelRequested = true;
-      job.status = 'removed';
+      await _cancelJob(job, markRemoved: true);
     }
     _jobs.clear();
     _started = false;
@@ -137,7 +143,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
   Future<void> pause(String gid) async {
     final job = _jobs[gid];
     if (job == null) return;
-    job.cancelRequested = true;
+    await _cancelJob(job);
     job.status = 'paused';
   }
 
@@ -155,8 +161,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
   Future<void> remove(String gid) async {
     final job = _jobs.remove(gid);
     if (job == null) return;
-    job.cancelRequested = true;
-    job.status = 'removed';
+    await _cancelJob(job, markRemoved: true);
   }
 
   @override
@@ -208,8 +213,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
   @override
   Future<void> resetSession() async {
     for (final job in _jobs.values.toList()) {
-      job.cancelRequested = true;
-      job.status = 'removed';
+      await _cancelJob(job, markRemoved: true);
     }
     _jobs.clear();
   }
@@ -218,6 +222,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
     if (job.status == 'active') return;
 
     final yt = YoutubeExplode();
+    final tempFiles = <File>[];
     try {
       final outputDir = Directory(job.directory);
       if (!await outputDir.exists()) {
@@ -238,44 +243,27 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
         ytClients: _clients,
       );
 
-      final tag = int.tryParse(job.options.formatId);
-      if (tag == null) {
-        throw StateError('Invalid format id: ${job.options.formatId}');
-      }
-
-      StreamInfo? streamInfo;
-      for (final stream in manifest.streams) {
-        if (stream.tag == tag) {
-          streamInfo = stream;
-          break;
-        }
-      }
-      if (streamInfo == null) {
-        throw StateError(
-          'Selected format ${job.options.formatId} is no longer available.',
+      final merge = parseMergeFormatId(job.options.formatId);
+      if (merge != null) {
+        await _downloadAndMerge(
+          job: job,
+          yt: yt,
+          manifest: manifest,
+          videoTag: merge.videoTag,
+          audioTag: merge.audioTag,
+          tempFiles: tempFiles,
+        );
+      } else {
+        await _downloadSingle(
+          job: job,
+          yt: yt,
+          manifest: manifest,
+          tempFiles: tempFiles,
         );
       }
 
-      job.totalBytes = streamInfo.size.totalBytes;
-      final file = File(job.outputPath);
-      final sink = file.openWrite();
-      try {
-        await for (final chunk in yt.videos.streamsClient.get(streamInfo)) {
-          if (job.cancelRequested) {
-            break;
-          }
-          sink.add(chunk);
-          job.downloadedBytes += chunk.length;
-          _updateSpeed(job);
-        }
-      } finally {
-        await sink.close();
-      }
-
       if (job.cancelRequested) {
-        try {
-          if (await file.exists()) await file.delete();
-        } catch (_) {}
+        await _deleteFiles([File(job.outputPath), ...tempFiles]);
         if (job.status != 'removed') {
           job.status = 'paused';
         }
@@ -288,8 +276,271 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
       if (job.status == 'paused' || job.status == 'removed') return;
       job.status = 'error';
       job.errorMessage = error.toString();
+      await _deleteFiles(tempFiles);
     } finally {
       yt.close();
+      if (job.status == 'complete') {
+        await _deleteFiles(tempFiles);
+      }
+    }
+  }
+
+  Future<void> _downloadSingle({
+    required _ExplodeJob job,
+    required YoutubeExplode yt,
+    required StreamManifest manifest,
+    required List<File> tempFiles,
+  }) async {
+    final tag = int.tryParse(job.options.formatId);
+    if (tag == null) {
+      throw StateError('Invalid format id: ${job.options.formatId}');
+    }
+
+    final streamInfo = _findStream(manifest, tag);
+    if (streamInfo == null) {
+      throw StateError(
+        'Selected format ${job.options.formatId} is no longer available.',
+      );
+    }
+
+    job.totalBytes = streamInfo.size.totalBytes;
+    await _downloadStreamToFile(
+      job: job,
+      yt: yt,
+      streamInfo: streamInfo,
+      target: File(job.outputPath),
+    );
+  }
+
+  Future<void> _downloadAndMerge({
+    required _ExplodeJob job,
+    required YoutubeExplode yt,
+    required StreamManifest manifest,
+    required int videoTag,
+    required int audioTag,
+    required List<File> tempFiles,
+  }) async {
+    final videoInfo = _findStream(manifest, videoTag);
+    final audioInfo = _findStream(manifest, audioTag);
+    if (videoInfo == null || audioInfo == null) {
+      throw StateError(
+        'Selected format ${job.options.formatId} is no longer available.',
+      );
+    }
+
+    final videoExt = videoInfo.container.name;
+    final audioExt = audioInfo.container.name;
+    final videoTemp = File(
+      p.join(job.directory, '.${job.gid.hashCode}.v.$videoExt'),
+    );
+    final audioTemp = File(
+      p.join(job.directory, '.${job.gid.hashCode}.a.$audioExt'),
+    );
+    tempFiles.addAll([videoTemp, audioTemp]);
+
+    job.totalBytes = videoInfo.size.totalBytes + audioInfo.size.totalBytes;
+
+    await _downloadStreamToFile(
+      job: job,
+      yt: yt,
+      streamInfo: videoInfo,
+      target: videoTemp,
+    );
+    if (job.cancelRequested) return;
+
+    await _downloadStreamToFile(
+      job: job,
+      yt: yt,
+      streamInfo: audioInfo,
+      target: audioTemp,
+    );
+    if (job.cancelRequested) return;
+
+    await _mergeTracks(
+      job: job,
+      videoPath: videoTemp.path,
+      audioPath: audioTemp.path,
+      outputPath: job.outputPath,
+    );
+  }
+
+  Future<void> _mergeTracks({
+    required _ExplodeJob job,
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+  }) async {
+    // Prefer Android MediaMuxer — bundled libffmpeg.so often SIGSEGVs on
+    // 16 KB page-size devices/emulators.
+    try {
+      await _runMediaMuxerMerge(
+        videoPath: videoPath,
+        audioPath: audioPath,
+        outputPath: outputPath,
+      );
+      return;
+    } catch (muxerError) {
+      try {
+        final ffmpegPath = await _resolveFfmpeg();
+        await _runFfmpegMerge(
+          job: job,
+          ffmpegPath: ffmpegPath,
+          videoPath: videoPath,
+          audioPath: audioPath,
+          outputPath: outputPath,
+        );
+      } catch (ffmpegError) {
+        final detail = ffmpegError.toString();
+        if (detail.contains('exit -11') ||
+            detail.contains('SIGSEGV') ||
+            detail.contains('code=-11')) {
+          throw StateError(
+            'Could not merge video and audio on this device. '
+            'Try a muxed (single-file) format, or a lower MP4 quality. '
+            '($muxerError)',
+          );
+        }
+        throw StateError(
+          'Merge failed. MediaMuxer: $muxerError; ffmpeg: $ffmpegError',
+        );
+      }
+    }
+  }
+
+  Future<void> _runMediaMuxerMerge({
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+  }) async {
+    const channel = MethodChannel('com.geonode.geonode_download_manager/engine');
+    await channel.invokeMethod<String>('mergeAv', {
+      'videoPath': videoPath,
+      'audioPath': audioPath,
+      'outputPath': outputPath,
+    });
+    final out = File(outputPath);
+    if (!await out.exists() || await out.length() == 0) {
+      throw StateError('MediaMuxer produced an empty output file.');
+    }
+  }
+
+  StreamInfo? _findStream(StreamManifest manifest, int tag) {
+    for (final stream in manifest.streams) {
+      if (stream.tag == tag) return stream;
+    }
+    return null;
+  }
+
+  Future<void> _downloadStreamToFile({
+    required _ExplodeJob job,
+    required YoutubeExplode yt,
+    required StreamInfo streamInfo,
+    required File target,
+  }) async {
+    final sink = target.openWrite();
+    try {
+      await for (final chunk in yt.videos.streamsClient.get(streamInfo)) {
+        if (job.cancelRequested) break;
+        sink.add(chunk);
+        job.downloadedBytes += chunk.length;
+        _updateSpeed(job);
+      }
+    } finally {
+      await sink.close();
+    }
+  }
+
+  Future<void> _runFfmpegMerge({
+    required _ExplodeJob job,
+    required String ffmpegPath,
+    required String videoPath,
+    required String audioPath,
+    required String outputPath,
+  }) async {
+    Future<ProcessResult> run(List<String> args) async {
+      final libDir = p.dirname(ffmpegPath);
+      final environment = Map<String, String>.from(Platform.environment);
+      final existing = environment['LD_LIBRARY_PATH'];
+      environment['LD_LIBRARY_PATH'] = existing == null || existing.isEmpty
+          ? libDir
+          : '$libDir:$existing';
+
+      job.ffmpegProcess = await Process.start(
+        ffmpegPath,
+        args,
+        environment: environment,
+        workingDirectory: libDir,
+      );
+      final stderrBuffer = StringBuffer();
+      final stderrDone = job.ffmpegProcess!.stderr
+          .transform(utf8.decoder)
+          .listen(stderrBuffer.write)
+          .asFuture<void>();
+      final stdoutDone = job.ffmpegProcess!.stdout.drain<void>();
+      final exitCode = await job.ffmpegProcess!.exitCode;
+      await Future.wait([stdoutDone, stderrDone]);
+      job.ffmpegProcess = null;
+      return ProcessResult(0, exitCode, '', stderrBuffer.toString());
+    }
+
+    var result = await run([
+      '-y',
+      '-i',
+      videoPath,
+      '-i',
+      audioPath,
+      '-c',
+      'copy',
+      '-map',
+      '0:v:0',
+      '-map',
+      '1:a:0',
+      outputPath,
+    ]);
+
+    if (job.cancelRequested) return;
+
+    if (result.exitCode != 0) {
+      result = await run([
+        '-y',
+        '-i',
+        videoPath,
+        '-i',
+        audioPath,
+        '-c:v',
+        'copy',
+        '-c:a',
+        'aac',
+        '-map',
+        '0:v:0',
+        '-map',
+        '1:a:0',
+        outputPath,
+      ]);
+    }
+
+    if (job.cancelRequested) return;
+
+    if (result.exitCode != 0) {
+      final stderr = result.stderr.toString().trim();
+      throw StateError(
+        stderr.isEmpty
+            ? 'ffmpeg failed to merge streams (exit ${result.exitCode}).'
+            : stderr,
+      );
+    }
+  }
+
+  Future<void> _cancelJob(_ExplodeJob job, {bool markRemoved = false}) async {
+    job.cancelRequested = true;
+    final process = job.ffmpegProcess;
+    if (process != null) {
+      process.kill();
+      await process.exitCode.catchError((_) => -1);
+      job.ffmpegProcess = null;
+    }
+    if (markRemoved) {
+      job.status = 'removed';
     }
   }
 
@@ -326,6 +577,14 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
     }
   }
 
+  Future<void> _deleteFiles(Iterable<File> files) async {
+    for (final file in files) {
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
+  }
+
   Aria2Status _toStatus(_ExplodeJob job) {
     final path = job.contentUri ?? job.outputPath;
     return Aria2Status(
@@ -338,7 +597,7 @@ class ExplodeYoutubeDownloadEngine implements DownloadEngine {
       pieceLength: 0,
       numPieces: 0,
       bitfield: null,
-      errorCode: job.status == 'error' ? 1 : null,
+      errorCode: null,
       errorMessage: job.errorMessage,
       files: [
         Aria2File(

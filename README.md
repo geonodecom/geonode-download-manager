@@ -53,7 +53,8 @@ Planned work (not shipped):
 
 Install **only GeoNode Download Manager**. Official Windows zip releases bundle
 **aria2**, **yt-dlp**, and **ffmpeg**. Android APKs use a native download service
-for HTTP and a built-in YouTube extractor — no separate tool installs required.
+for HTTP, a built-in YouTube extractor, and bundled **ffmpeg** (`libffmpeg.so`)
+for high-resolution merges — no separate tool installs required.
 
 Release packages include [`packaging/THIRD_PARTY_NOTICES.md`](packaging/THIRD_PARTY_NOTICES.md).
 
@@ -101,12 +102,16 @@ sudo apt install python3 clang cmake ninja-build pkg-config libgtk-3-dev libstdc
 
 - Android SDK with cmdline-tools, platform-tools, and a recent platform (API 35+)
 - Accepted Android SDK licenses (`flutter doctor --android-licenses`)
+- Run `tool/android/fetch_deps.ps1` before `flutter build apk` / `appbundle` so
+  `libffmpeg.so` and `libc++_shared.so` are installed under
+  `android/app/src/main/jniLibs/<abi>/` (requires a local Android NDK)
 
 Android direct HTTP downloads run in `DownloadForegroundService`. YouTube on
-Android uses a built-in Dart extractor (`youtube_explode_dart`) — no yt-dlp
-process. Desktop YouTube still uses bundled yt-dlp + ffmpeg. YouTube downloading
-may conflict with Play Store policy; sideload/dev builds are the safest target
-for now.
+Android uses `youtube_explode_dart` for metadata/streams and bundled ffmpeg
+(`libffmpeg.so`) to merge high-resolution video+audio (same style of format
+list as desktop). APK size grows substantially because static ffmpeg is
+packaged per ABI. YouTube downloading may conflict with Play Store policy;
+sideload/dev builds are the safest target for now.
 
 ## Development
 
@@ -216,6 +221,11 @@ powershell -File tool/android/fetch_deps.ps1
 flutter build apk --release
 flutter build appbundle --release
 ```
+
+`fetch_deps.ps1` installs static ffmpeg as
+`android/app/src/main/jniLibs/<abi>/libffmpeg.so` plus matching
+`libc++_shared.so` from the Android NDK (required to run ffmpeg). CI runs the
+same step before packaging.
 
 Outputs:
 

@@ -39,6 +39,3 @@ flutter:
     - images/icon.png
     - images/tray-icon.png
     - images/tray-icon.ico
-    - assets/bin/android/arm64-v8a/
-    - assets/bin/android/armeabi-v7a/
-    - assets/bin/android/x86_64/

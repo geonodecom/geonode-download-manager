@@ -41,11 +41,11 @@ String? aria2ErrorLabel(int? errorCode) {
 }
 
 String? friendlyErrorSummary(DownloadEntity download) {
-  final label = aria2ErrorLabel(download.aria2ErrorCode);
-  if (label != null) return label;
-
   final raw = download.error?.trim();
   if (raw != null && raw.isNotEmpty) return raw;
+
+  final label = aria2ErrorLabel(download.aria2ErrorCode);
+  if (label != null) return label;
   return null;
 }
 

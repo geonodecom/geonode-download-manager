@@ -17,6 +17,8 @@ class UrlClassifier {
   /// Trims and, for bare YouTube hosts, prepends `https://`.
   static String normalizeInputUrl(String raw) {
     var text = raw.trim();
+    // Strip zero-width / BOM characters that break Uri host parsing on paste.
+    text = text.replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '');
     if (text.isEmpty) return text;
 
     if (!text.startsWith('http://') && !text.startsWith('https://')) {
@@ -108,9 +110,10 @@ class UrlClassifier {
   }
 
   static bool _isPlaylistOnly(Uri uri) {
+    // Only /playlist URLs are playlists. watch?v=…&list=… (mix/radio) is a
+    // single video — handled earlier when a video id is present.
     final path = uri.path.toLowerCase();
-    if (path.startsWith('/playlist')) return true;
-    return uri.queryParameters.containsKey('list');
+    return path == '/playlist' || path.startsWith('/playlist/');
   }
 
   static String? _validVideoId(String? value) {

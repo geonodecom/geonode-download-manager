@@ -146,6 +146,27 @@ class DownloadEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Eve
                 }
             }
             "getAbi" -> Build.SUPPORTED_ABIS.firstOrNull()
+            "getFfmpegPath" -> {
+                val path = "${appContext.applicationInfo.nativeLibraryDir}/libffmpeg.so"
+                val file = java.io.File(path)
+                if (!file.exists()) {
+                    error(
+                        "Bundled ffmpeg (libffmpeg.so) was not found. " +
+                            "Rebuild with tool/android/fetch_deps.ps1.",
+                    )
+                }
+                path
+            }
+            "mergeAv" -> {
+                val videoPath = call.argument<String>("videoPath")
+                    ?: error("videoPath required")
+                val audioPath = call.argument<String>("audioPath")
+                    ?: error("audioPath required")
+                val outputPath = call.argument<String>("outputPath")
+                    ?: error("outputPath required")
+                MediaMerger.merge(videoPath, audioPath, outputPath)
+                outputPath
+            }
             "publishFile" -> {
                 val sourcePath = call.argument<String>("sourcePath")
                     ?: error("sourcePath required")

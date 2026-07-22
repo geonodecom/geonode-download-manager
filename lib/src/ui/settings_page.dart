@@ -10,7 +10,7 @@ import '../data/app_database.dart';
 import '../platform/bundled_executable.dart';
 import '../platform/executable_finder.dart';
 import '../providers.dart';
-import '../ytdlp/ytdlp_executable.dart';
+import '../ytdlp/android_ffmpeg.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -299,11 +299,15 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     setState(() => _checkingBundledTools = true);
 
     if (Platform.isAndroid) {
+      final ready = await androidFfmpegAvailable();
       if (!mounted) return;
       setState(() {
         _checkingBundledTools = false;
-        _bundledToolsStatus =
-            'Android YouTube uses the built-in extractor (no yt-dlp binary).';
+        _bundledToolsStatus = ready
+            ? 'Built-in YouTube extractor ready; bundled ffmpeg available for '
+                'high-res merges.'
+            : 'Bundled ffmpeg (libffmpeg.so) missing. Run '
+                'tool/android/fetch_deps.ps1 before building.';
       });
       return;
     }
@@ -443,13 +447,13 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
         }
       }
     } else {
-      final resolver = YtdlpExecutableResolver();
-      final available = await resolver.areAvailable();
+      final available = await androidFfmpegAvailable();
       if (!available) {
         setState(() {
           _messages.add(
             _ValidationMessage.error(
-              'Bundled tools are missing. Run tool/android/fetch_deps.ps1 before building.',
+              'Bundled ffmpeg (libffmpeg.so) is missing. '
+              'Run tool/android/fetch_deps.ps1 before building.',
             ),
           );
           _saving = false;

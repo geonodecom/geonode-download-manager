@@ -341,7 +341,7 @@ class YtdlpDownloadEngine implements DownloadEngine {
       pieceLength: 0,
       numPieces: 0,
       bitfield: null,
-      errorCode: job.status == 'error' ? 1 : null,
+      errorCode: null,
       errorMessage: job.errorMessage,
       files: [
         Aria2File(

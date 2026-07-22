@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Fetched Android native tools (run tool/android/fetch_deps.ps1)
+/android/app/src/main/jniLibs/**/libffmpeg.so
+/android/app/src/main/jniLibs/**/libc++_shared.so
+
+# Legacy Android asset binaries (no longer used)
+/assets/bin/android/**/ffmpeg
+/assets/bin/android/**/yt-dlp

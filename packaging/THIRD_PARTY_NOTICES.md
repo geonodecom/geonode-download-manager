@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 Geonode Download Manager release builds may bundle the following third-party
-tools in the `bin/` directory (desktop) or app assets (Android):
+tools in the `bin/` directory (desktop) or as Android `jniLibs` (`libffmpeg.so`):
 
 ## aria2
 
@@ -13,7 +13,8 @@ tools in the `bin/` directory (desktop) or app assets (Android):
 
 - Project: https://github.com/yt-dlp/yt-dlp
 - License: Unlicense
-- Used for YouTube metadata extraction and downloads.
+- Used for YouTube metadata extraction and downloads on **desktop**.
+- Android uses `youtube_explode_dart` instead (no yt-dlp process).
 
 ## ffmpeg
 
