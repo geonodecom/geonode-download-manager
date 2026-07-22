@@ -213,7 +213,7 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
   Future<void> _submit() async {
     final url = _url.text.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      setState(() => _error = 'GeoNode currently supports HTTP and HTTPS URLs.');
+      setState(() => _error = 'Geonode currently supports HTTP and HTTPS URLs.');
       return;
     }
     final directory = Platform.isAndroid

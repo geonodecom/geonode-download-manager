@@ -47,7 +47,7 @@ class DiagnosticsPage extends ConsumerWidget {
             data: (entries) {
               if (entries.isEmpty) {
                 return const Center(
-                  child: Text('No events yet. Events appear as GeoNode Download Manager runs.'),
+                  child: Text('No events yet. Events appear as Geonode Download Manager runs.'),
                 );
               }
               return ListView.builder(
@@ -183,7 +183,7 @@ Future<void> _confirmResetSession(
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Engine session reset. Restart GeoNode Download Manager to start fresh.',
+            'Engine session reset. Restart Geonode Download Manager to start fresh.',
           ),
         ),
       );

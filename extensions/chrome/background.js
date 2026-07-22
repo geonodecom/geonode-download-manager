@@ -169,7 +169,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.contextMenus.create({
     id: "download-with-geonode",
-    title: "Download with GeoNode",
+    title: "Download with Geonode",
     contexts: ["link"],
   });
 });
@@ -198,14 +198,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (resp && resp.success) {
     debugLog("download handed off successfully", "trace=" + traceID);
-    showNotification("Sent to GeoNode", url.split("/").pop() || "Download");
+    showNotification("Sent to Geonode", url.split("/").pop() || "Download");
   } else if (isUnavailable(resp)) {
     debugLog("geonode unavailable, falling back to browser", url);
     reinitiatedUrls.add(url);
     chrome.downloads.download({ url });
-    showNotification("GeoNode unavailable", "Downloading normally");
+    showNotification("Geonode unavailable", "Downloading normally");
   } else {
-    debugLog("GeoNode rejected", resp.error, url, "trace=" + traceID);
+    debugLog("Geonode rejected", resp.error, url, "trace=" + traceID);
     showNotification("Download rejected", resp.error || "Unknown error");
   }
 });
@@ -279,7 +279,7 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 
   if (resp && resp.success) {
     debugLog("download handed off successfully", "trace=" + traceID);
-    // GeoNode accepted — cancel the browser's download to avoid duplicates.
+    // Geonode accepted — cancel the browser's download to avoid duplicates.
     // Best-effort: if cancel fails (already completed, etc.), no harm done.
     try {
       await chrome.downloads.cancel(downloadItem.id);
@@ -291,11 +291,11 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
   } else if (isUnavailable(resp)) {
     debugLog("geonode unavailable, falling back to browser", url);
     if (!failureNotified) {
-      showNotification("GeoNode unavailable", "Downloading normally");
+      showNotification("Geonode unavailable", "Downloading normally");
       failureNotified = true;
     }
   } else {
-    debugLog("GeoNode rejected", resp.error, url, "trace=" + traceID);
+    debugLog("Geonode rejected", resp.error, url, "trace=" + traceID);
     showNotification("Download rejected", resp.error || "Unknown error");
   }
 });
@@ -303,7 +303,7 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 // --- Content script messages ---
 
 // Shorter timeout for user-initiated actions (link clicks, context menu)
-// so the browser doesn't stall visibly if host or GeoNode hangs.
+// so the browser doesn't stall visibly if host or Geonode hangs.
 const USER_ACTION_TIMEOUT_MS = 3000;
 
 function sendCommandWithTimeout(cmd, timeoutMs) {
@@ -371,14 +371,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     if (resp && resp.success) {
       debugLog("download handed off successfully", "trace=" + traceID);
-      showNotification("Sent to GeoNode", msg.url.split("/").pop() || "Download");
+      showNotification("Sent to Geonode", msg.url.split("/").pop() || "Download");
     } else if (isUnavailable(resp)) {
       debugLog("geonode unavailable, falling back to browser", msg.url);
       reinitiatedUrls.add(msg.url);
       chrome.downloads.download({ url: msg.url });
-      showNotification("GeoNode unavailable", "Downloading normally");
+      showNotification("Geonode unavailable", "Downloading normally");
     } else {
-      debugLog("GeoNode rejected", resp.error, msg.url, "trace=" + traceID);
+      debugLog("Geonode rejected", resp.error, msg.url, "trace=" + traceID);
       showNotification("Download rejected", resp.error || "Unknown error");
     }
 

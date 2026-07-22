@@ -43,7 +43,7 @@ Future<String> findAria2Executable({String override = ''}) async {
     if (found != null) return found;
   }
 
-  throw StateError('aria2c was not found. Install aria2 and restart GeoNode Download Manager.');
+  throw StateError('aria2c was not found. Install aria2 and restart Geonode Download Manager.');
 }
 
 /// Returns true when [path] exists and looks runnable on this platform.

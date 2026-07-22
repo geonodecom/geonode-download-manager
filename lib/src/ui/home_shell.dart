@@ -52,10 +52,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       data: (_) => _pageFor(section),
       loading: () => const _StartupMessage(
         title: 'Starting download engine',
-        message: 'GeoNode is preparing the local download engine.',
+        message: 'Geonode is preparing the local download engine.',
       ),
       error: (error, _) => _StartupMessage(
-        title: 'GeoNode could not start',
+        title: 'Geonode could not start',
         message: error.toString(),
       ),
     );

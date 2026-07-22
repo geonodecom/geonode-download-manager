@@ -27,7 +27,7 @@ void main() {
   test('popup uses app-oriented connection states', () {
     final popup = File('extensions/chrome/popup/popup.js').readAsStringSync();
 
-    expect(popup, contains('GeoNode not running'));
+    expect(popup, contains('Geonode not running'));
     expect(popup, contains('Native host not installed'));
     expect(popup, isNot(contains('Daemon not running')));
   });

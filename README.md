@@ -4,7 +4,7 @@
 
 ## Status
 
-GeoNode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
+Geonode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
 targets. Desktop builds use system `aria2c`. Android uses a native foreground
 service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
@@ -142,7 +142,7 @@ Desktop only. Android uses share / view intents instead.
 
 ### Linux
 
-`make install` installs the GeoNode Download Manager app, the `geonode-download-manager-host` native messaging bridge,
+`make install` installs the Geonode Download Manager app, the `geonode-download-manager-host` native messaging bridge,
 and native host manifests for Google Chrome, Chromium, and Brave.
 
 ### Windows
@@ -153,15 +153,15 @@ keys for Chrome, Chromium, Edge, and Brave.
 
 To use the extension during development:
 
-1. Install GeoNode Download Manager (`make install` on Linux, or `powershell -File tool/windows/install.ps1` on Windows).
+1. Install Geonode Download Manager (`make install` on Linux, or `powershell -File tool/windows/install.ps1` on Windows).
 2. Open `chrome://extensions`, `edge://extensions`, or `brave://extensions`.
 3. Enable Developer mode.
 4. Choose **Load unpacked** and select `extensions/chrome`.
 
-The extension adds a **Download with GeoNode** link context-menu item. Automatic
+The extension adds a **Download with Geonode** link context-menu item. Automatic
 download capture is off by default and can be enabled from the extension popup.
-Manual captures can launch GeoNode Download Manager when needed. Automatic captures only hand off to
-an already-running GeoNode Download Manager instance; if GeoNode Download Manager is unavailable, the extension falls
+Manual captures can launch Geonode Download Manager when needed. Automatic captures only hand off to
+an already-running Geonode Download Manager instance; if Geonode Download Manager is unavailable, the extension falls
 back to the browser download and shows a notification.
 
 On Windows, the running app publishes a loopback TCP endpoint file at

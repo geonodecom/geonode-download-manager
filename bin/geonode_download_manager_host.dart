@@ -13,7 +13,7 @@ Future<void> main(List<String> args) async {
       case '--help':
       case '-h':
       case 'help':
-        stderr.writeln('geonode-download-manager-host - native messaging bridge for GeoNode Download Manager');
+        stderr.writeln('geonode-download-manager-host - native messaging bridge for Geonode Download Manager');
         return;
     }
   }

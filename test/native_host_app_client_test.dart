@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 
 void main() {
   test(
-    'automatic capture does not launch GeoNode Download Manager when the app socket is absent',
+    'automatic capture does not launch Geonode Download Manager when the app socket is absent',
     () async {
       final fixture = await _launchFixture();
       final client = NativeHostAppClient(
@@ -32,7 +32,7 @@ void main() {
     },
   );
 
-  test('user capture may launch GeoNode Download Manager when the app socket is absent', () async {
+  test('user capture may launch Geonode Download Manager when the app socket is absent', () async {
     final fixture = await _launchFixture();
     final client = NativeHostAppClient(
       endpoint: fixture.endpoint,
