@@ -4,6 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geonode_download_manager/src/platform/bundled_executable.dart';
 import 'package:path/path.dart' as p;
 
+String _toolName(String baseName) {
+  return Platform.isWindows ? '$baseName.exe' : baseName;
+}
+
 void main() {
   tearDown(() {
     setAppDirectoryOverrideForTesting(null);
@@ -11,23 +15,28 @@ void main() {
 
   test('findBundledExecutable returns tool from app bin directory', () async {
     final root = await Directory.systemTemp.createTemp('geonode-bin-test');
-    final bin = Directory('${root.path}/bin')..createSync();
-    File('${bin.path}/yt-dlp.exe').writeAsStringSync('stub');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final bin = Directory(p.join(root.path, 'bin'))..createSync();
+    final toolName = _toolName('yt-dlp');
+    File(p.join(bin.path, toolName)).writeAsStringSync('stub');
     setAppDirectoryOverrideForTesting(root.path);
 
     final found = await findBundledExecutable('yt-dlp');
     expect(found, isNotNull);
-    expect(p.basename(found!), 'yt-dlp.exe');
+    expect(p.basename(found!), toolName);
     expect(p.normalize(p.dirname(found)), p.normalize(bin.path));
   });
 
   test('resolveExecutable prefers override then bundled then PATH', () async {
     final root = await Directory.systemTemp.createTemp('geonode-resolve-test');
-    final bin = Directory('${root.path}/bin')..createSync();
-    final bundled = File('${bin.path}/ffmpeg.exe')..writeAsStringSync('stub');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final bin = Directory(p.join(root.path, 'bin'))..createSync();
+    final bundledName = _toolName('ffmpeg');
+    final bundled = File(p.join(bin.path, bundledName))
+      ..writeAsStringSync('stub');
     setAppDirectoryOverrideForTesting(root.path);
 
-    final overridePath = '${root.path}/custom-ffmpeg.exe';
+    final overridePath = p.join(root.path, _toolName('custom-ffmpeg'));
     File(overridePath).writeAsStringSync('override');
 
     final fromOverride = await resolveExecutable(
@@ -46,7 +55,7 @@ void main() {
     );
     expect(p.normalize(fromBundled), p.normalize(bundled.path));
 
-    setAppDirectoryOverrideForTesting('${root.path}/empty');
+    setAppDirectoryOverrideForTesting(p.join(root.path, 'empty'));
     final fromPath = await resolveExecutable(
       baseName: 'ffmpeg',
       override: '',
@@ -58,13 +67,14 @@ void main() {
 
   test('desktopBundledToolsReady requires aria2 yt-dlp and ffmpeg', () async {
     final root = await Directory.systemTemp.createTemp('geonode-all-test');
-    final bin = Directory('${root.path}/bin')..createSync();
+    addTearDown(() => root.deleteSync(recursive: true));
+    final bin = Directory(p.join(root.path, 'bin'))..createSync();
     setAppDirectoryOverrideForTesting(root.path);
 
     expect(await desktopBundledToolsReady(), isFalse);
 
     for (final name in ['aria2c', 'yt-dlp', 'ffmpeg']) {
-      File('${bin.path}/$name.exe').writeAsStringSync('stub');
+      File(p.join(bin.path, _toolName(name))).writeAsStringSync('stub');
     }
 
     expect(await desktopBundledToolsReady(), isTrue);
