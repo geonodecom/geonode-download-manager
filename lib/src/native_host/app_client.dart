@@ -70,7 +70,7 @@ class NativeHostAppClient implements NativeHostAppConnection {
         await Future<void>.delayed(const Duration(milliseconds: 150));
       }
     }
-    throw TimeoutException('GeoNode did not become available: $lastError');
+    throw TimeoutException('Geonode did not become available: $lastError');
   }
 
   Future<Map<String, Object?>> _sendOnce(Map<String, Object?> command) async {

@@ -2,9 +2,17 @@
   <strong>Fast, opinionated download manager for desktop and Android.</strong>
 </p>
 
+<p align="center">
+  <img
+    src="geonode-donwload-manager-windows.png"
+    alt="Geonode Download Manager on Windows showing the Downloads screen"
+    width="720"
+  />
+</p>
+
 ## Status
 
-GeoNode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
+Geonode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
 targets. Desktop builds use system `aria2c`. Android uses a native foreground
 service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
@@ -33,19 +41,8 @@ Planned work (not shipped):
 - [ ] Video site download (YouTube, Dailymotion, Facebook)
 - [ ] Torrent / magnet support
 - [ ] Signed Play Store releases (production keystore in CI)
-- [ ] Automated Linux and Windows release artifacts in CI
-
-## Releasing
-
-Push a commit to `main` whose message contains a semver marker:
-
-```text
-RELEASE 0.2.0
-```
-
-That triggers the GitHub Actions release workflow, which builds a release Android
-APK, creates tag `v0.2.0`, and publishes a GitHub Release with the APK attached.
-Linux and Windows builds remain manual for now (see [Build](#build)).
+- [x] Automated Windows release zip in CI
+- [ ] Automated Linux release artifacts in CI
 
 ## Requirements
 
@@ -142,7 +139,7 @@ Desktop only. Android uses share / view intents instead.
 
 ### Linux
 
-`make install` installs the GeoNode Download Manager app, the `geonode-download-manager-host` native messaging bridge,
+`make install` installs the Geonode Download Manager app, the `geonode-download-manager-host` native messaging bridge,
 and native host manifests for Google Chrome, Chromium, and Brave.
 
 ### Windows
@@ -153,15 +150,15 @@ keys for Chrome, Chromium, Edge, and Brave.
 
 To use the extension during development:
 
-1. Install GeoNode Download Manager (`make install` on Linux, or `powershell -File tool/windows/install.ps1` on Windows).
+1. Install Geonode Download Manager (`make install` on Linux, or `powershell -File tool/windows/install.ps1` on Windows).
 2. Open `chrome://extensions`, `edge://extensions`, or `brave://extensions`.
 3. Enable Developer mode.
 4. Choose **Load unpacked** and select `extensions/chrome`.
 
-The extension adds a **Download with GeoNode** link context-menu item. Automatic
+The extension adds a **Download with Geonode** link context-menu item. Automatic
 download capture is off by default and can be enabled from the extension popup.
-Manual captures can launch GeoNode Download Manager when needed. Automatic captures only hand off to
-an already-running GeoNode Download Manager instance; if GeoNode Download Manager is unavailable, the extension falls
+Manual captures can launch Geonode Download Manager when needed. Automatic captures only hand off to
+an already-running Geonode Download Manager instance; if Geonode Download Manager is unavailable, the extension falls
 back to the browser download and shows a notification.
 
 On Windows, the running app publishes a loopback TCP endpoint file at
@@ -202,13 +199,6 @@ Outputs:
 Release builds currently sign with the debug keystore so local install works.
 Replace `signingConfig` in `android/app/build.gradle.kts` with your Play Store
 keystore before publishing.
-
-### Play Store notes
-
-- Declare the `dataSync` foreground service for active downloads.
-- Request `POST_NOTIFICATIONS` on Android 13+.
-- Disclose background/foreground download behavior in the Play Console data-safety form.
-- Direct HTTP(S) file downloads only; do not claim YouTube/streaming extraction support.
 
 ## Install Locally
 

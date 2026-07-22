@@ -98,7 +98,7 @@ void main() {
         fileName: 'download.iso',
         split: 16,
         startImmediately: false,
-        headers: {'Referer': 'https://example.com/', 'User-Agent': 'GeoNode test'},
+        headers: {'Referer': 'https://example.com/', 'User-Agent': 'Geonode test'},
         source: 'browser_extension',
       ),
     );
@@ -107,7 +107,7 @@ void main() {
     expect(created.source, 'browser_extension');
     expect(options['headers'], {
       'Referer': 'https://example.com/',
-      'User-Agent': 'GeoNode test',
+      'User-Agent': 'Geonode test',
     });
   });
 

@@ -1,4 +1,4 @@
-# Install GeoNode Download Manager under %LOCALAPPDATA%\geonode-download-manager and register Chromium native messaging hosts.
+# Install Geonode Download Manager under %LOCALAPPDATA%\geonode-download-manager and register Chromium native messaging hosts.
 $ErrorActionPreference = "Stop"
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -51,16 +51,16 @@ foreach ($key in $RegistryKeys) {
 
 # Start Menu shortcut
 $StartMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
-$ShortcutPath = Join-Path $StartMenu "GeoNode Download Manager.lnk"
+$ShortcutPath = Join-Path $StartMenu "Geonode Download Manager.lnk"
 $Wsh = New-Object -ComObject WScript.Shell
 $Shortcut = $Wsh.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath = Join-Path $InstallDir "geonode-download-manager.exe"
 $Shortcut.WorkingDirectory = $InstallDir
-$Shortcut.Description = "GeoNode Download Manager"
+$Shortcut.Description = "Geonode Download Manager"
 $Shortcut.Save()
 Write-Host "Start Menu shortcut: $ShortcutPath"
 
-Write-Host "Installed GeoNode Download Manager."
+Write-Host "Installed Geonode Download Manager."
 Write-Host "  App:      $(Join-Path $InstallDir 'geonode-download-manager.exe')"
 Write-Host "  Host:     $(Join-Path $InstallDir 'geonode-download-manager-host.exe')"
 Write-Host "  Manifest: $ManifestPath"

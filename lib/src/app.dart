@@ -22,7 +22,7 @@ class GeonodeMaterialApp extends ConsumerWidget {
         );
 
     return MaterialApp(
-      title: 'GeoNode Download Manager',
+      title: 'Geonode Download Manager',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: ThemeData(

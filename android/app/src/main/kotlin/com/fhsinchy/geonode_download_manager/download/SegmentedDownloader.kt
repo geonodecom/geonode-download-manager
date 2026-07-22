@@ -173,7 +173,7 @@ class SegmentedDownloader(
         connection.instanceFollowRedirects = true
         connection.connectTimeout = 30_000
         connection.readTimeout = 60_000
-        connection.setRequestProperty("User-Agent", "GeoNodeDownloadManager/0.1")
+        connection.setRequestProperty("User-Agent", "GeonodeDownloadManager/0.1")
         for ((key, value) in task.headers) {
             connection.setRequestProperty(key, value)
         }
@@ -194,7 +194,7 @@ class SegmentedDownloader(
         head.instanceFollowRedirects = true
         head.connectTimeout = 20_000
         head.readTimeout = 20_000
-        head.setRequestProperty("User-Agent", "GeoNodeDownloadManager/0.1")
+        head.setRequestProperty("User-Agent", "GeonodeDownloadManager/0.1")
         for ((key, value) in task.headers) {
             head.setRequestProperty(key, value)
         }

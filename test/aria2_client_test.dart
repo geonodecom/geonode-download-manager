@@ -97,7 +97,7 @@ void main() {
       split: 16,
       headers: const {
         'Referer': 'https://example.com/',
-        'User-Agent': 'GeoNode test',
+        'User-Agent': 'Geonode test',
       },
     );
 
@@ -108,7 +108,7 @@ void main() {
         'dir': '/tmp',
         'split': '16',
         'max-connection-per-server': '16',
-        'header': 'Referer: https://example.com/\nUser-Agent: GeoNode test',
+        'header': 'Referer: https://example.com/\nUser-Agent: Geonode test',
       },
     ]);
 

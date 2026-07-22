@@ -108,7 +108,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               labelText: 'aria2 executable override',
               hintText: 'Leave empty to use aria2c from PATH',
               helperText:
-                  'Requires restarting GeoNode Download Manager to take effect.',
+                  'Requires restarting Geonode Download Manager to take effect.',
             ),
           ),
           const SizedBox(height: 16),
@@ -131,7 +131,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
           decoration: const InputDecoration(
             labelText: 'Active downloads',
             helperText:
-                'Requires restarting GeoNode Download Manager to take effect.',
+                'Requires restarting Geonode Download Manager to take effect.',
           ),
           items: const [1, 2, 3, 4, 5]
               .map(
@@ -147,7 +147,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
           decoration: const InputDecoration(
             labelText: 'Default connections',
             helperText:
-                'Requires restarting GeoNode Download Manager to take effect.',
+                'Requires restarting Geonode Download Manager to take effect.',
           ),
           items: const [1, 4, 8, 16, 24, 32]
               .map(
@@ -320,7 +320,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       _messages.add(
         engineChanged
             ? _ValidationMessage.success(
-                'Saved. Restart GeoNode Download Manager to apply download engine changes.',
+                'Saved. Restart Geonode Download Manager to apply download engine changes.',
               )
             : _ValidationMessage.success('Saved.'),
       );

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// A lightweight in-memory diagnostics log for GeoNode Download Manager service and aria2 events.
+/// A lightweight in-memory diagnostics log for Geonode Download Manager service and aria2 events.
 ///
 /// Keeps the last [_maxEvents] entries. Used by the in-app diagnostics panel.
 class DiagnosticsLog {

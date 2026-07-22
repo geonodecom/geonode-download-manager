@@ -51,7 +51,7 @@ check-linux-deps:
 
 check-not-running:
 	@if pgrep -x "$(APP_NAME)" >/dev/null; then \
-		echo "GeoNode Download Manager is already running. Quit GeoNode Download Manager from the tray before using this target."; \
+		echo "Geonode Download Manager is already running. Quit Geonode Download Manager from the tray before using this target."; \
 		echo "Running instances:"; \
 		pgrep -ax "$(APP_NAME)"; \
 		exit 1; \

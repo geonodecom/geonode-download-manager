@@ -1,4 +1,4 @@
-# Build GeoNode Download Manager for Windows (release) and geonode-download-manager-host.exe
+# Build Geonode Download Manager for Windows (release) and geonode-download-manager-host.exe
 $ErrorActionPreference = "Stop"
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")

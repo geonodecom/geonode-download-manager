@@ -21,7 +21,7 @@ Future<void> main() async {
     await windowManager.setPreventClose(true);
     windowManager.waitUntilReadyToShow(
       const WindowOptions(
-        title: 'GeoNode Download Manager',
+        title: 'Geonode Download Manager',
         size: Size(1180, 760),
         minimumSize: Size(920, 620),
         center: true,
@@ -91,14 +91,14 @@ class _GeonodeAppState extends ConsumerState<GeonodeApp>
         : 'images/tray-icon.png';
     await trayManager.setIcon(icon);
     try {
-      await trayManager.setToolTip('GeoNode Download Manager');
+      await trayManager.setToolTip('Geonode Download Manager');
     } on MissingPluginException {
       // Linux support in tray_manager does not currently implement tooltips.
     }
     await trayManager.setContextMenu(
       Menu(
         items: [
-          MenuItem(key: 'open', label: 'Open GeoNode Download Manager'),
+          MenuItem(key: 'open', label: 'Open Geonode Download Manager'),
           MenuItem(key: 'add', label: 'Add Download'),
           MenuItem.separator(),
           MenuItem(key: 'pause_all', label: 'Pause All'),

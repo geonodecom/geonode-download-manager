@@ -1,9 +1,9 @@
-# Uninstall GeoNode Download Manager Windows install and native messaging registration.
+# Uninstall Geonode Download Manager Windows install and native messaging registration.
 $ErrorActionPreference = "Stop"
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "geonode-download-manager"
 $NativeHostName = "com.fhsinchy.geonode_download_manager"
-$ShortcutPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\GeoNode Download Manager.lnk"
+$ShortcutPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Geonode Download Manager.lnk"
 
 $RegistryKeys = @(
   "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$NativeHostName",

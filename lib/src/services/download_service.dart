@@ -379,6 +379,6 @@ class DeleteDownloadedFilesException implements Exception {
 
   @override
   String toString() {
-    return 'Removed from GeoNode Download Manager, but could not delete downloaded files: $cause';
+    return 'Removed from Geonode Download Manager, but could not delete downloaded files: $cause';
   }
 }

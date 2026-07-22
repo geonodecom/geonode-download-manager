@@ -8,9 +8,13 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  meta:
     if: contains(github.event.head_commit.message, 'RELEASE ')
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,60 +43,144 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
+  android:
+    needs: meta
+    if: needs.meta.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Flutter
-        if: steps.version.outputs.skip != 'true'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
       - name: Install dependencies
-        if: steps.version.outputs.skip != 'true'
         run: flutter pub get
 
       - name: Generate code
-        if: steps.version.outputs.skip != 'true'
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Bump pubspec version in workspace
-        if: steps.version.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.meta.outputs.version }}"
           BUILD="${{ github.run_number }}"
           sed -i -E "s/^version: .*/version: ${VERSION}+${BUILD}/" pubspec.yaml
           grep -E '^version:' pubspec.yaml
 
       - name: Analyze
-        if: steps.version.outputs.skip != 'true'
         run: flutter analyze
 
       - name: Test
-        if: steps.version.outputs.skip != 'true'
         run: flutter test
 
       - name: Build Android APK
-        if: steps.version.outputs.skip != 'true'
         run: flutter build apk --release
 
       - name: Prepare artifact
-        if: steps.version.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.meta.outputs.version }}"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk \
             "dist/geonode-download-manager-${VERSION}.apk"
 
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: dist/geonode-download-manager-${{ needs.meta.outputs.version }}.apk
+          if-no-files-found: error
+
+  windows:
+    needs: meta
+    if: needs.meta.outputs.skip == 'false'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Bump pubspec version in workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.meta.outputs.version }}"
+          BUILD="${{ github.run_number }}"
+          sed -i -E "s/^version: .*/version: ${VERSION}+${BUILD}/" pubspec.yaml
+          grep -E '^version:' pubspec.yaml
+
+      - name: Build Windows release
+        shell: pwsh
+        run: powershell -File tool/windows/build.ps1
+
+      - name: Package Windows zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Version = "${{ needs.meta.outputs.version }}"
+          $StageName = "geonode-download-manager-$Version-windows-x64"
+          $Stage = Join-Path "dist" $StageName
+          $Zip = Join-Path "dist" "$StageName.zip"
+          $ReleaseDir = "build\windows\x64\runner\Release"
+          $HostExe = "build\geonode-download-manager-host.exe"
+
+          New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+          Copy-Item -Path (Join-Path $ReleaseDir "*") -Destination $Stage -Recurse -Force
+          if (-not (Test-Path $HostExe)) {
+            throw "Missing host binary: $HostExe"
+          }
+          Copy-Item -Force $HostExe $Stage
+
+          if (Test-Path $Zip) { Remove-Item -Force $Zip }
+          Compress-Archive -Path (Join-Path $Stage "*") -DestinationPath $Zip
+          Get-Item $Zip | Format-List FullName, Length
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/geonode-download-manager-${{ needs.meta.outputs.version }}-windows-x64.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [meta, android, windows]
+    if: needs.meta.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-android
+          path: dist
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows
+          path: dist
+
       - name: Create GitHub Release
-        if: steps.version.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: ${{ needs.meta.outputs.tag }}
           generate_release_notes: true
-          files: dist/geonode-download-manager-${{ steps.version.outputs.version }}.apk
+          files: |
+            dist/geonode-download-manager-${{ needs.meta.outputs.version }}.apk
+            dist/geonode-download-manager-${{ needs.meta.outputs.version }}-windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
