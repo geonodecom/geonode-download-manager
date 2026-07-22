@@ -9,8 +9,10 @@ import '../aria2/aria2_models.dart';
 import '../data/app_database.dart';
 import '../data/download_repository.dart';
 import '../engine/download_engine.dart';
+import '../ytdlp/ytdlp_models.dart';
 import 'diagnostics.dart';
 import 'download_probe.dart';
+import 'url_classifier.dart';
 
 class DownloadService {
   DownloadService({
@@ -48,6 +50,8 @@ class DownloadService {
       maxActiveDownloads: settings.maxActiveDownloads,
       defaultSplit: settings.defaultSplit,
       executableOverride: settings.aria2Path,
+      ytdlpPath: settings.ytdlpPath,
+      ffmpegPath: settings.ffmpegPath,
     );
     _diagnostics?.info('Download engine started.');
     _started = true;
@@ -71,7 +75,9 @@ class DownloadService {
       throw DownloadAlreadyExistsException(existing.id);
     }
 
-    final metadata = await _probe.probe(input);
+    final metadata = _shouldProbe(input)
+        ? await _probe.probe(input)
+        : input.metadata;
     final entity = await _repository.createDownload(
       input.copyWith(metadata: metadata),
     );
@@ -233,6 +239,7 @@ class DownloadService {
     final downloads = await _repository.listQueuedMissingMetadata();
     for (final download in downloads) {
       if (!_metadataProbeAttempts.add(download.id)) continue;
+      if (isYoutubeDownloadOptions(download.optionsJson)) continue;
       final metadata = await _probe.probe(
         NewDownload(
           url: download.url,
@@ -295,6 +302,7 @@ class DownloadService {
         split: entity.split,
         fileName: entity.fileName,
         headers: _headersFor(entity),
+        optionsJson: _optionsFor(entity),
       );
       _diagnostics?.info('Download queued: ${entity.url} → gid $gid');
       stderr.writeln('[geonode] queued ${entity.url} as engine gid $gid');
@@ -342,6 +350,25 @@ class DownloadService {
     final path = uri?.path ?? url;
     final basename = p.basename(path);
     return basename.isEmpty ? null : basename;
+  }
+
+  bool _shouldProbe(NewDownload input) {
+    if (input.options['kind']?.toString() == YoutubeDownloadOptions.kind) {
+      return false;
+    }
+    return UrlClassifier.classify(input.url) == DownloadUrlKind.direct;
+  }
+
+  Map<String, Object?>? _optionsFor(DownloadEntity entity) {
+    final options = entity.optionsJson;
+    if (options == null || options.trim().isEmpty) return null;
+    try {
+      final decoded = jsonDecode(options);
+      if (decoded is! Map) return null;
+      return decoded.cast<String, Object?>();
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, String> _headersFor(DownloadEntity entity) {

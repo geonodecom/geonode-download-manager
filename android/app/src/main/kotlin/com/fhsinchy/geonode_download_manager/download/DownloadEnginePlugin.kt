@@ -145,6 +145,19 @@ class DownloadEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Eve
                     ) == PackageManager.PERMISSION_GRANTED
                 }
             }
+            "getAbi" -> Build.SUPPORTED_ABIS.firstOrNull()
+            "publishFile" -> {
+                val sourcePath = call.argument<String>("sourcePath")
+                    ?: error("sourcePath required")
+                val displayName = call.argument<String>("displayName")
+                    ?: error("displayName required")
+                val uri = MediaStorePublisher.publish(
+                    appContext,
+                    java.io.File(sourcePath),
+                    displayName,
+                )
+                uri.toString()
+            }
             else -> throw IllegalArgumentException("Unknown method ${call.method}")
         }
     }

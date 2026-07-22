@@ -1,0 +1,364 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+
+import '../aria2/aria2_models.dart';
+import '../ytdlp/ytdlp_executable.dart';
+import '../ytdlp/ytdlp_models.dart';
+import '../ytdlp/ytdlp_progress.dart';
+import 'download_engine.dart';
+
+class _YtdlpJob {
+  _YtdlpJob({
+    required this.gid,
+    required this.url,
+    required this.directory,
+    required this.fileName,
+    required this.options,
+    required this.outputPath,
+  });
+
+  final String gid;
+  final String url;
+  final String directory;
+  final String fileName;
+  final YoutubeDownloadOptions options;
+  final String outputPath;
+  Process? process;
+  var status = 'waiting';
+  var downloadedBytes = 0;
+  var totalBytes = 0;
+  var speed = 0;
+  String? errorMessage;
+  String? contentUri;
+}
+
+/// [DownloadEngine] that runs yt-dlp subprocesses for YouTube downloads.
+class YtdlpDownloadEngine implements DownloadEngine {
+  YtdlpDownloadEngine({
+    YtdlpExecutableResolver? resolver,
+    Future<String?> Function(String sourcePath, String displayName)? publishFile,
+  }) : _resolver = resolver ?? YtdlpExecutableResolver(),
+       _publishFile = publishFile ?? _defaultPublishFile;
+
+  final YtdlpExecutableResolver _resolver;
+  final Future<String?> Function(String sourcePath, String displayName)
+  _publishFile;
+  final Map<String, _YtdlpJob> _jobs = {};
+  var _started = false;
+  String _downloadDirectory = '';
+  String _ytdlpOverride = '';
+  String _ffmpegOverride = '';
+
+  static Future<String?> _defaultPublishFile(
+    String sourcePath,
+    String displayName,
+  ) async {
+    if (!Platform.isAndroid) return null;
+    const channel = MethodChannel('com.fhsinchy.geonode_download_manager/engine');
+    try {
+      final uri = await channel.invokeMethod<String>('publishFile', {
+        'sourcePath': sourcePath,
+        'displayName': displayName,
+      });
+      return uri;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> get isHealthy async => _started;
+
+  @override
+  Future<void> start({
+    required String downloadDirectory,
+    required int maxActiveDownloads,
+    required int defaultSplit,
+    String executableOverride = '',
+    String ytdlpPath = '',
+    String ffmpegPath = '',
+  }) async {
+    _downloadDirectory = downloadDirectory;
+    _ytdlpOverride = ytdlpPath;
+    _ffmpegOverride = ffmpegPath;
+    _started = true;
+  }
+
+  @override
+  Future<void> shutdown() async {
+    for (final job in _jobs.values.toList()) {
+      await _stopJob(job, markRemoved: true);
+    }
+    _jobs.clear();
+    _started = false;
+  }
+
+  @override
+  Future<String> addUri({
+    required String url,
+    required String directory,
+    required int split,
+    String? fileName,
+    Map<String, String> headers = const {},
+    int? position,
+    Map<String, Object?>? optionsJson,
+  }) async {
+    final options = _youtubeOptions(optionsJson);
+    if (options == null) {
+      throw StateError('YouTube engine requires youtube options.');
+    }
+
+    final gid = 'ytdlp:${const Uuid().v4()}';
+    final targetDirectory = directory.isNotEmpty ? directory : _downloadDirectory;
+    final resolvedName = fileName?.trim().isNotEmpty == true
+        ? fileName!.trim()
+        : options.sanitizedFileName;
+    final outputPath = p.join(targetDirectory, resolvedName);
+
+    final job = _YtdlpJob(
+      gid: gid,
+      url: url,
+      directory: targetDirectory,
+      fileName: resolvedName,
+      options: options,
+      outputPath: outputPath,
+    );
+    _jobs[gid] = job;
+    unawaited(_runJob(job));
+    return gid;
+  }
+
+  @override
+  Future<void> pause(String gid) async {
+    final job = _jobs[gid];
+    if (job == null) return;
+    await _stopJob(job);
+    job.status = 'paused';
+  }
+
+  @override
+  Future<void> unpause(String gid) async {
+    final job = _jobs[gid];
+    if (job == null) return;
+    if (job.status == 'complete' || job.status == 'error') return;
+    job.status = 'waiting';
+    unawaited(_runJob(job));
+  }
+
+  @override
+  Future<void> remove(String gid) async {
+    final job = _jobs.remove(gid);
+    if (job == null) return;
+    await _stopJob(job, markRemoved: true);
+  }
+
+  @override
+  Future<void> changePosition(String gid, int position) async {}
+
+  @override
+  Future<Aria2Status> tellStatus(String gid) async {
+    final job = _jobs[gid];
+    if (job == null) {
+      throw StateError('Unknown yt-dlp job: $gid');
+    }
+    return _toStatus(job);
+  }
+
+  @override
+  Future<List<Aria2Status>> tellActive() async {
+    return _jobs.values
+        .where((job) => job.status == 'active')
+        .map(_toStatus)
+        .toList();
+  }
+
+  @override
+  Future<List<Aria2Status>> tellWaiting({int offset = 0, int limit = 100}) async {
+    return _jobs.values
+        .where((job) => job.status == 'waiting')
+        .skip(offset)
+        .take(limit)
+        .map(_toStatus)
+        .toList();
+  }
+
+  @override
+  Future<List<Aria2Status>> tellStopped({int offset = 0, int limit = 100}) async {
+    return _jobs.values
+        .where(
+          (job) =>
+              job.status == 'complete' ||
+              job.status == 'error' ||
+              job.status == 'paused' ||
+              job.status == 'removed',
+        )
+        .skip(offset)
+        .take(limit)
+        .map(_toStatus)
+        .toList();
+  }
+
+  @override
+  Future<void> resetSession() async {
+    for (final job in _jobs.values.toList()) {
+      await _stopJob(job, markRemoved: true);
+    }
+    _jobs.clear();
+  }
+
+  Future<void> _runJob(_YtdlpJob job) async {
+    if (job.status == 'active') return;
+
+    try {
+      final binaries = await _resolver.resolve(
+        ytdlpOverride: _ytdlpOverride,
+        ffmpegOverride: _ffmpegOverride,
+      );
+      final outputDir = Directory(job.directory);
+      if (!await outputDir.exists()) {
+        await outputDir.create(recursive: true);
+      }
+
+      job.status = 'active';
+      job.errorMessage = null;
+
+      final args = [
+        '--no-playlist',
+        '--continue',
+        '--newline',
+        '--progress',
+        '--progress-template',
+        'progress:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.speed)s:%(progress.eta)s',
+        '--ffmpeg-location',
+        p.dirname(binaries.ffmpegPath),
+        '--format',
+        job.options.formatId,
+        '-o',
+        job.outputPath,
+        job.url,
+      ];
+
+      job.process = await Process.start(
+        binaries.ytdlpPath,
+        args,
+        runInShell: Platform.isWindows,
+      );
+
+      final stderrBuffer = StringBuffer();
+      final stdoutDone = job.process!.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .map((line) {
+            _applyProgressLine(job, line);
+          })
+          .drain();
+      final stderrDone = job.process!.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .map((line) {
+            stderrBuffer.writeln(line);
+            _applyProgressLine(job, line);
+          })
+          .drain();
+
+      await Future.wait([stdoutDone, stderrDone]);
+
+      final exitCode = await job.process!.exitCode;
+      job.process = null;
+
+      if (exitCode == 0) {
+        await _finalizeJob(job);
+        job.status = 'complete';
+        return;
+      }
+
+      if (job.status == 'paused' || job.status == 'removed') {
+        return;
+      }
+
+      job.status = 'error';
+      job.errorMessage = stderrBuffer.toString().trim().isEmpty
+          ? 'yt-dlp failed with exit code $exitCode.'
+          : stderrBuffer.toString().trim();
+    } catch (error) {
+      if (job.status == 'paused' || job.status == 'removed') return;
+      job.status = 'error';
+      job.errorMessage = error.toString();
+    }
+  }
+
+  Future<void> _finalizeJob(_YtdlpJob job) async {
+    final file = File(job.outputPath);
+    if (!await file.exists()) return;
+
+    job.totalBytes = await file.length();
+    job.downloadedBytes = job.totalBytes;
+
+    final published = await _publishFile(job.outputPath, job.fileName);
+    if (published != null && published.isNotEmpty) {
+      job.contentUri = published;
+      try {
+        await file.delete();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _stopJob(_YtdlpJob job, {bool markRemoved = false}) async {
+    final process = job.process;
+    if (process != null) {
+      process.kill();
+      await process.exitCode.catchError((_) => -1);
+      job.process = null;
+    }
+    if (markRemoved) {
+      job.status = 'removed';
+    }
+  }
+
+  void _applyProgressLine(_YtdlpJob job, String line) {
+    final progress =
+        parseYtdlpProgressLine(line) ?? parseLegacyYtdlpProgressLine(line);
+    if (progress == null) return;
+    job.downloadedBytes = progress.downloadedBytes;
+    job.totalBytes = progress.totalBytes;
+    job.speed = progress.speedBytesPerSecond;
+  }
+
+  Aria2Status _toStatus(_YtdlpJob job) {
+    final path = job.contentUri ?? job.outputPath;
+    return Aria2Status(
+      gid: job.gid,
+      status: job.status,
+      totalLength: job.totalBytes,
+      completedLength: job.downloadedBytes,
+      downloadSpeed: job.speed,
+      connections: 1,
+      pieceLength: 0,
+      numPieces: 0,
+      bitfield: null,
+      errorCode: job.status == 'error' ? 1 : null,
+      errorMessage: job.errorMessage,
+      files: [
+        Aria2File(
+          path: path,
+          length: job.totalBytes,
+          completedLength: job.downloadedBytes,
+          uris: [job.url],
+        ),
+      ],
+    );
+  }
+
+  YoutubeDownloadOptions? _youtubeOptions(Map<String, Object?>? optionsJson) {
+    if (optionsJson == null) return null;
+    if (optionsJson['kind']?.toString() != YoutubeDownloadOptions.kind) {
+      return null;
+    }
+    return YoutubeDownloadOptions.fromJson(optionsJson);
+  }
+}

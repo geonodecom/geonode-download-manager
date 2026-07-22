@@ -21,6 +21,7 @@ dependencies:
   tray_manager: ^0.5.3
   uuid: ^4.5.2
   window_manager: ^0.5.1
+  youtube_explode_dart: ^3.1.0
 
 dev_dependencies:
   flutter_test:
@@ -38,3 +39,6 @@ flutter:
     - images/icon.png
     - images/tray-icon.png
     - images/tray-icon.ico
+    - assets/bin/android/arm64-v8a/
+    - assets/bin/android/armeabi-v7a/
+    - assets/bin/android/x86_64/

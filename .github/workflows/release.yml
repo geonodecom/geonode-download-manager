@@ -78,6 +78,10 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Fetch bundled Android tools
+        shell: pwsh
+        run: powershell -File tool/android/fetch_deps.ps1
+
       - name: Build Android APK
         run: flutter build apk --release
 
@@ -144,6 +148,13 @@ jobs:
             throw "Missing host binary: $HostExe"
           }
           Copy-Item -Force $HostExe $Stage
+
+          foreach ($tool in @("aria2c.exe", "yt-dlp.exe", "ffmpeg.exe")) {
+            $path = Join-Path $Stage "bin\$tool"
+            if (-not (Test-Path $path)) {
+              throw "Missing bundled tool in release: $path"
+            }
+          }
 
           if (Test-Path $Zip) { Remove-Item -Force $Zip }
           Compress-Archive -Path (Join-Path $Stage "*") -DestinationPath $Zip

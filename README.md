@@ -17,9 +17,9 @@ targets. Desktop builds use system `aria2c`. Android uses a native foreground
 service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
 
-The app focuses on direct HTTP/HTTPS file downloads, queueing, resume, and useful
-download details. Site extractors (for example YouTube watch pages) and torrent
-downloads are not implemented yet; see [Roadmap](#roadmap).
+The app focuses on direct HTTP/HTTPS file downloads, YouTube video extraction,
+queueing, resume, and useful download details. Torrent downloads are not
+implemented yet; see [Roadmap](#roadmap).
 
 ## Features
 
@@ -33,12 +33,15 @@ downloads are not implemented yet; see [Roadmap](#roadmap).
 - [x] Desktop system tray integration
 - [x] Chromium extension handoff through a native messaging host (desktop)
 - [x] Android share / open-with intake for direct HTTP(S) URLs
+- [x] YouTube video download with format selection (desktop: yt-dlp + ffmpeg; Android: built-in extractor)
+- [x] YouTube playlists (queue each entry) and common URL styles (watch, Shorts, live, embed, music, youtu.be)
 
 ## Roadmap
 
 Planned work (not shipped):
 
-- [ ] Video site download (YouTube, Dailymotion, Facebook)
+- [ ] YouTube authenticated / private streams and channel pages
+- [ ] More video sites (Dailymotion, Facebook)
 - [ ] Torrent / magnet support
 - [ ] Signed Play Store releases (production keystore in CI)
 - [x] Automated Windows release zip in CI
@@ -46,46 +49,64 @@ Planned work (not shipped):
 
 ## Requirements
 
-### Common
+### End users (release installs)
+
+Install **only GeoNode Download Manager**. Official Windows zip releases bundle
+**aria2**, **yt-dlp**, and **ffmpeg**. Android APKs use a native download service
+for HTTP and a built-in YouTube extractor — no separate tool installs required.
+
+Release packages include [`packaging/THIRD_PARTY_NOTICES.md`](packaging/THIRD_PARTY_NOTICES.md).
+
+### Developers
 
 - Flutter 3.41+
 - Dart 3.11+
 
-### Linux
+Before building a release locally, fetch bundled tools:
 
-- `aria2c` 1.37+ on `PATH` (or set a custom path in Settings)
+```powershell
+# Windows
+powershell -File tool/windows/fetch_deps.ps1
+
+# Linux
+make fetch-deps
+
+# Android
+powershell -File tool/android/fetch_deps.ps1
+```
+
+During development, `flutter run` can still use tools from PATH if bundled
+`bin/` is not present yet.
+
+### Linux build host
+
 - Linux desktop build dependencies for Flutter
 - AppIndicator/Ayatana development headers for tray support
 - `lld-21` or another linker available next to `clang++`
+- `python3` when using the bundled Linux yt-dlp script
+- Bundled tools from `make fetch-deps` **or** system `aria2c`, `yt-dlp`, and `ffmpeg` on PATH
 
 On Debian/Ubuntu-like systems:
 
 ```sh
-sudo apt install aria2 clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libayatana-appindicator3-dev lld-21
+sudo apt install python3 clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libayatana-appindicator3-dev lld-21
 ```
 
-On Fedora:
-
-```sh
-sudo dnf install aria2 clang cmake ninja-build pkgconf-pkg-config gtk3-devel libstdc++-devel libayatana-appindicator-gtk3-devel lld
-```
-
-### Windows
+### Windows build host
 
 - [Visual Studio](https://visualstudio.microsoft.com/) with the **Desktop development with C++** workload
 - Windows Developer Mode enabled (Flutter plugin symlinks), or equivalent symlink privilege
-- `aria2c.exe` on `PATH` (for example via [Scoop](https://scoop.sh/) `scoop install aria2` or [Chocolatey](https://chocolatey.org/) `choco install aria2`)
 
-### Android
+### Android build host
 
 - Android SDK with cmdline-tools, platform-tools, and a recent platform (API 35+)
 - Accepted Android SDK licenses (`flutter doctor --android-licenses`)
-- Emulator or physical device with USB debugging
-- Notification permission on Android 13+ (requested at launch)
 
-Android does **not** require system `aria2c`. Downloads run in
-`DownloadForegroundService` and finished files appear in the public Downloads
-folder.
+Android direct HTTP downloads run in `DownloadForegroundService`. YouTube on
+Android uses a built-in Dart extractor (`youtube_explode_dart`) — no yt-dlp
+process. Desktop YouTube still uses bundled yt-dlp + ffmpeg. YouTube downloading
+may conflict with Play Store policy; sideload/dev builds are the safest target
+for now.
 
 ## Development
 
@@ -117,12 +138,16 @@ make run-debug-bundle
 ### Windows
 
 ```powershell
+powershell -File tool/windows/fetch_deps.ps1
 flutter run -d windows
+# release build (fetch + copy bundled tools automatically):
+powershell -File tool/windows/build.ps1
 ```
 
 ### Android
 
 ```powershell
+powershell -File tool/android/fetch_deps.ps1
 flutter devices
 flutter run -d <android-device-id>
 ```
@@ -187,6 +212,7 @@ The release bundle is written to `build/windows/x64/runner/Release/`.
 ### Android
 
 ```powershell
+powershell -File tool/android/fetch_deps.ps1
 flutter build apk --release
 flutter build appbundle --release
 ```
