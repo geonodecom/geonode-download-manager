@@ -28,6 +28,8 @@ class Aria2DownloadEngine implements DownloadEngine {
     required int maxActiveDownloads,
     required int defaultSplit,
     String executableOverride = '',
+    String ytdlpPath = '',
+    String ffmpegPath = '',
   }) async {
     await _processManager.start(
       downloadDirectory: downloadDirectory,
@@ -48,6 +50,7 @@ class Aria2DownloadEngine implements DownloadEngine {
     String? fileName,
     Map<String, String> headers = const {},
     int? position,
+    Map<String, Object?>? optionsJson,
   }) {
     return _processManager.client().addUri(
       url: url,

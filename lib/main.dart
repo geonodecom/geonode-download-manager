@@ -147,7 +147,7 @@ class _GeonodeAppState extends ConsumerState<GeonodeApp>
   Future<void> _requestAndroidNotificationPermission() async {
     try {
       await const MethodChannel(
-        'com.fhsinchy.geonode_download_manager/engine',
+        'com.geonode.geonode_download_manager/engine',
       ).invokeMethod<void>('requestNotificationPermission');
     } catch (_) {
       // Optional on older Android versions.

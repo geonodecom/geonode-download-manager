@@ -46,6 +46,31 @@ void main() {
       expect(errorIsRetryable(_fakeDownload(status: 'active')), isFalse);
     });
   });
+
+  group('friendlyErrorSummary', () {
+    test('prefers raw engine message over aria2 code label', () {
+      expect(
+        friendlyErrorSummary(
+          _fakeDownload(
+            aria2ErrorCode: 1,
+            error: 'ProcessException: Permission denied',
+          ),
+        ),
+        'ProcessException: Permission denied',
+      );
+    });
+
+    test('falls back to aria2 label when raw error is empty', () {
+      expect(
+        friendlyErrorSummary(_fakeDownload(aria2ErrorCode: 9, error: '')),
+        'Disk full',
+      );
+      expect(
+        friendlyErrorSummary(_fakeDownload(aria2ErrorCode: 3)),
+        'File not found',
+      );
+    });
+  });
 }
 
 DownloadEntity _fakeDownload({

@@ -90,6 +90,9 @@ class GeonodeSettings {
     required this.maxActiveDownloads,
     required this.defaultSplit,
     required this.aria2Path,
+    required this.ytdlpPath,
+    required this.ffmpegPath,
+    required this.youtubeFormatPreset,
     required this.themeMode,
   });
 
@@ -97,6 +100,9 @@ class GeonodeSettings {
   final int maxActiveDownloads;
   final int defaultSplit;
   final String aria2Path;
+  final String ytdlpPath;
+  final String ffmpegPath;
+  final String youtubeFormatPreset;
   final String themeMode;
 
   GeonodeSettings copyWith({
@@ -104,6 +110,9 @@ class GeonodeSettings {
     int? maxActiveDownloads,
     int? defaultSplit,
     String? aria2Path,
+    String? ytdlpPath,
+    String? ffmpegPath,
+    String? youtubeFormatPreset,
     String? themeMode,
   }) {
     return GeonodeSettings(
@@ -111,6 +120,10 @@ class GeonodeSettings {
       maxActiveDownloads: maxActiveDownloads ?? this.maxActiveDownloads,
       defaultSplit: defaultSplit ?? this.defaultSplit,
       aria2Path: aria2Path ?? this.aria2Path,
+      ytdlpPath: ytdlpPath ?? this.ytdlpPath,
+      ffmpegPath: ffmpegPath ?? this.ffmpegPath,
+      youtubeFormatPreset:
+          youtubeFormatPreset ?? this.youtubeFormatPreset,
       themeMode: themeMode ?? this.themeMode,
     );
   }

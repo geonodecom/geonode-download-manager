@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../ytdlp/ytdlp_models.dart';
 import '../aria2/aria2_models.dart';
 import '../platform/open_path.dart';
 import 'app_database.dart';
@@ -19,6 +20,7 @@ class NewDownload {
     this.metadata = const DownloadMetadata(),
     this.headers = const {},
     this.source = 'manual',
+    this.options = const {},
   });
 
   final String url;
@@ -29,6 +31,7 @@ class NewDownload {
   final DownloadMetadata metadata;
   final Map<String, String> headers;
   final String source;
+  final Map<String, Object?> options;
 
   NewDownload copyWith({DownloadMetadata? metadata}) {
     return NewDownload(
@@ -40,6 +43,7 @@ class NewDownload {
       metadata: metadata ?? this.metadata,
       headers: headers,
       source: source,
+      options: options,
     );
   }
 }
@@ -173,9 +177,7 @@ class DownloadRepository {
       totalLength: Value(input.metadata.totalLength),
       split: Value(input.split),
       source: Value(input.source),
-      optionsJson: Value(
-        input.headers.isEmpty ? null : jsonEncode({'headers': input.headers}),
-      ),
+      optionsJson: Value(_encodeOptions(input)),
       createdAt: now,
       updatedAt: now,
     );
@@ -388,6 +390,18 @@ class DownloadRepository {
           value: settings.aria2Path,
         ),
         AppSettingsCompanion.insert(
+          key: 'ytdlp_path',
+          value: settings.ytdlpPath,
+        ),
+        AppSettingsCompanion.insert(
+          key: 'ffmpeg_path',
+          value: settings.ffmpegPath,
+        ),
+        AppSettingsCompanion.insert(
+          key: 'youtube_format_preset',
+          value: settings.youtubeFormatPreset,
+        ),
+        AppSettingsCompanion.insert(
           key: 'theme_mode',
           value: settings.themeMode,
         ),
@@ -405,6 +419,9 @@ class DownloadRepository {
         maxActiveDownloads: 1,
         defaultSplit: 16,
         aria2Path: '',
+        ytdlpPath: '',
+        ffmpegPath: '',
+        youtubeFormatPreset: 'best_mp4',
         themeMode: 'system',
       ),
     );
@@ -424,9 +441,29 @@ class DownloadRepository {
           int.tryParse(values['max_active_downloads'] ?? '') ?? 1,
       defaultSplit: int.tryParse(values['default_split'] ?? '') ?? 16,
       aria2Path: values['aria2_path'] ?? '',
+      ytdlpPath: values['ytdlp_path'] ?? '',
+      ffmpegPath: values['ffmpeg_path'] ?? '',
+      youtubeFormatPreset: values['youtube_format_preset'] ?? 'best_mp4',
       themeMode: values['theme_mode'] ?? 'system',
     );
   }
+}
+
+bool isYoutubeDownload(DownloadEntity entity) {
+  return isYoutubeDownloadOptions(entity.optionsJson);
+}
+
+YoutubeDownloadOptions? youtubeOptionsFor(DownloadEntity entity) {
+  return youtubeOptionsFromJson(entity.optionsJson);
+}
+
+String? _encodeOptions(NewDownload input) {
+  final payload = <String, Object?>{...input.options};
+  if (input.headers.isNotEmpty) {
+    payload['headers'] = input.headers;
+  }
+  if (payload.isEmpty) return null;
+  return jsonEncode(payload);
 }
 
 String? _resolvedFileName(NewDownload input) {

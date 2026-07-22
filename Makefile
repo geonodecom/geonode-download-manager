@@ -12,7 +12,7 @@ HICOLOR_DIR := $(HOME)/.local/share/icons/hicolor
 ICON_DIR := $(HICOLOR_DIR)/256x256/apps
 APP_ICON := $(ICON_DIR)/geonode-download-manager.png
 USER_SYSTEMD_DIR := $(HOME)/.config/systemd/user
-NATIVE_HOST_NAME := com.fhsinchy.geonode_download_manager
+NATIVE_HOST_NAME := com.geonode.geonode_download_manager
 NATIVE_HOST_BUILD := build/geonode-download-manager-host
 NATIVE_HOST_BUILD_DIR := build/geonode-download-manager-host-cli
 NATIVE_HOST_INSTALLED := $(BIN_DIR)/geonode-download-manager-host
@@ -22,9 +22,11 @@ NATIVE_HOST_DIRS := \
 	$(HOME)/.config/chromium/NativeMessagingHosts \
 	$(HOME)/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts
 
+DEPS_BIN := build/deps/linux-x64/bin
+
 .PHONY: \
 	get codegen analyze test clean \
-	check-linux-deps check-not-running \
+	fetch-deps check-linux-deps check-not-running \
 	build-host build build-debug \
 	run debug run-log run-verbose run-release run-bundle run-debug-bundle \
 	install install-built install-app install-desktop install-native-host \
@@ -49,6 +51,17 @@ clean:
 check-linux-deps:
 	@tool/check_linux_deps.sh
 
+fetch-deps:
+	@chmod +x tool/linux/fetch_deps.sh
+	@tool/linux/fetch_deps.sh
+
+copy-deps: fetch-deps
+	mkdir -p "$(BUNDLE_DIR)/bin"
+	cp -a "$(DEPS_BIN)/." "$(BUNDLE_DIR)/bin/"
+	@if [ -f packaging/THIRD_PARTY_NOTICES.md ]; then \
+		cp packaging/THIRD_PARTY_NOTICES.md "$(BUNDLE_DIR)/"; \
+	fi
+
 check-not-running:
 	@if pgrep -x "$(APP_NAME)" >/dev/null; then \
 		echo "Geonode Download Manager is already running. Quit Geonode Download Manager from the tray before using this target."; \
@@ -63,9 +76,11 @@ build-host:
 
 build: check-linux-deps codegen build-host
 	flutter build linux --release
+	$(MAKE) copy-deps
 
 build-debug: check-linux-deps codegen
 	flutter build linux --debug
+	$(MAKE) copy-deps BUNDLE_DIR=$(DEBUG_BUNDLE_DIR)
 
 run: check-linux-deps check-not-running codegen
 	flutter run -d linux

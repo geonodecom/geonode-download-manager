@@ -6,10 +6,14 @@ import 'data/app_database.dart';
 import 'data/download_repository.dart';
 import 'engine/android_download_engine.dart';
 import 'engine/aria2_download_engine.dart';
+import 'engine/composite_download_engine.dart';
 import 'engine/download_engine.dart';
+import 'engine/explode_youtube_download_engine.dart';
+import 'engine/ytdlp_download_engine.dart';
 import 'extension/download_capture.dart';
 import 'services/diagnostics.dart';
 import 'services/download_service.dart';
+import 'ytdlp/youtube_metadata_client.dart';
 
 enum ShellSection { downloads, queue, history, settings, diagnostics }
 
@@ -74,10 +78,27 @@ final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
 
 final downloadEngineProvider = Provider<DownloadEngine>((ref) {
   final diagnostics = ref.watch(diagnosticsLogProvider);
-  if (Platform.isAndroid) {
-    return AndroidDownloadEngine();
-  }
-  return Aria2DownloadEngine(diagnostics: diagnostics);
+  final base = Platform.isAndroid
+      ? AndroidDownloadEngine()
+      : Aria2DownloadEngine(diagnostics: diagnostics);
+  final youtube = Platform.isAndroid
+      ? ExplodeYoutubeDownloadEngine()
+      : YtdlpDownloadEngine();
+  return CompositeDownloadEngine(
+    baseEngine: base,
+    youtubeEngine: youtube,
+  );
+});
+
+final ytdlpClientProvider = Provider<YoutubeMetadataClient>((ref) {
+  final settings = ref.watch(settingsProvider).maybeWhen(
+        data: (value) => value,
+        orElse: () => null,
+      );
+  return createYoutubeMetadataClient(
+    ytdlpOverride: settings?.ytdlpPath ?? '',
+    ffmpegOverride: settings?.ffmpegPath ?? '',
+  );
 });
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {

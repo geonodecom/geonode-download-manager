@@ -13,6 +13,8 @@ abstract class DownloadEngine {
     required int maxActiveDownloads,
     required int defaultSplit,
     String executableOverride = '',
+    String ytdlpPath = '',
+    String ffmpegPath = '',
   });
 
   Future<void> shutdown();
@@ -24,6 +26,7 @@ abstract class DownloadEngine {
     String? fileName,
     Map<String, String> headers = const {},
     int? position,
+    Map<String, Object?>? optionsJson,
   });
 
   Future<void> pause(String gid);

@@ -4,10 +4,24 @@ $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $Root
 
+Write-Host "Fetching bundled download tools..."
+& (Join-Path $PSScriptRoot "fetch_deps.ps1")
+
 Write-Host "Building Flutter Windows release..."
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 flutter build windows --release
+
+$ReleaseDir = Join-Path $Root "build\windows\x64\runner\Release"
+$BinDir = Join-Path $ReleaseDir "bin"
+$DepsBin = Join-Path $Root "build\deps\windows-x64\bin"
+$NoticesSrc = Join-Path $Root "packaging\THIRD_PARTY_NOTICES.md"
+
+New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+Copy-Item -Path (Join-Path $DepsBin "*") -Destination $BinDir -Force
+if (Test-Path $NoticesSrc) {
+  Copy-Item -Force $NoticesSrc (Join-Path $ReleaseDir "THIRD_PARTY_NOTICES.md")
+}
 
 Write-Host "Building geonode-download-manager-host..."
 $HostOut = Join-Path $Root "build\geonode-download-manager-host-cli"

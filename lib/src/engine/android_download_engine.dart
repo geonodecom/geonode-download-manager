@@ -12,11 +12,11 @@ class AndroidDownloadEngine implements DownloadEngine {
     EventChannel? eventChannel,
   }) : _methods =
            methodChannel ??
-           const MethodChannel('com.fhsinchy.geonode_download_manager/engine'),
+           const MethodChannel('com.geonode.geonode_download_manager/engine'),
        _events =
            eventChannel ??
            const EventChannel(
-             'com.fhsinchy.geonode_download_manager/engine_events',
+             'com.geonode.geonode_download_manager/engine_events',
            );
 
   final MethodChannel _methods;
@@ -42,6 +42,8 @@ class AndroidDownloadEngine implements DownloadEngine {
     required int maxActiveDownloads,
     required int defaultSplit,
     String executableOverride = '',
+    String ytdlpPath = '',
+    String ffmpegPath = '',
   }) async {
     await _methods.invokeMethod<void>('start', {
       'downloadDirectory': downloadDirectory,
@@ -69,6 +71,7 @@ class AndroidDownloadEngine implements DownloadEngine {
     String? fileName,
     Map<String, String> headers = const {},
     int? position,
+    Map<String, Object?>? optionsJson,
   }) async {
     final gid = await _methods.invokeMethod<String>('addUri', {
       'url': url,

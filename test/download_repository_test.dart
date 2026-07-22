@@ -90,6 +90,32 @@ void main() {
     expect(created.totalLength, 4096);
   });
 
+  test('createDownload stores youtube options', () async {
+    final created = await repository.createDownload(
+      const NewDownload(
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        directory: '/tmp/youtube',
+        fileName: 'Sample Video.mp4',
+        split: 1,
+        startImmediately: false,
+        source: 'youtube',
+        options: {
+          'kind': 'youtube',
+          'formatId': '22',
+          'title': 'Sample Video',
+          'ext': 'mp4',
+        },
+      ),
+    );
+    final options = jsonDecode(created.optionsJson!) as Map<String, Object?>;
+
+    expect(created.source, 'youtube');
+    expect(options['kind'], 'youtube');
+    expect(options['formatId'], '22');
+    expect(isYoutubeDownload(created), isTrue);
+    expect(youtubeOptionsFor(created)?.title, 'Sample Video');
+  });
+
   test('createDownload stores browser extension headers and source', () async {
     final created = await repository.createDownload(
       const NewDownload(

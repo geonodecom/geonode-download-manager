@@ -6,6 +6,7 @@ class FakeDownloadEngine implements DownloadEngine {
   final Map<String, Aria2Status> statuses = {};
   var started = false;
   var resetCount = 0;
+  Map<String, Object?>? lastOptionsJson;
 
   @override
   Future<bool> get isHealthy async => started;
@@ -16,6 +17,8 @@ class FakeDownloadEngine implements DownloadEngine {
     required int maxActiveDownloads,
     required int defaultSplit,
     String executableOverride = '',
+    String ytdlpPath = '',
+    String ffmpegPath = '',
   }) async {
     started = true;
   }
@@ -33,8 +36,12 @@ class FakeDownloadEngine implements DownloadEngine {
     String? fileName,
     Map<String, String> headers = const {},
     int? position,
+    Map<String, Object?>? optionsJson,
   }) async {
-    final gid = 'gid-${statuses.length + 1}';
+    lastOptionsJson = optionsJson;
+    final gid = optionsJson?['kind'] == 'youtube'
+        ? 'ytdlp:fake-${statuses.length + 1}'
+        : 'gid-${statuses.length + 1}';
     statuses[gid] = Aria2Status(
       gid: gid,
       status: 'active',

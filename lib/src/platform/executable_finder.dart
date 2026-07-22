@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'bundled_executable.dart';
+
 /// Locates an executable on PATH using a platform-appropriate tool.
 Future<String?> findOnPath(String name) async {
   if (Platform.isWindows) {
@@ -26,24 +28,54 @@ Future<String?> findOnPath(String name) async {
   return path;
 }
 
-/// Finds aria2c, preferring [override] when set.
-Future<String> findAria2Executable({String override = ''}) async {
-  if (override.isNotEmpty) {
-    final file = File(override);
-    if (await file.exists()) return override;
-    throw StateError('aria2 executable was not found at $override');
-  }
-
-  final candidates = Platform.isWindows
-      ? const ['aria2c.exe', 'aria2c']
-      : const ['aria2c'];
-
+Future<String> _findOnPathByCandidates(List<String> candidates) async {
   for (final name in candidates) {
     final found = await findOnPath(name);
     if (found != null) return found;
   }
+  throw StateError('not found on PATH');
+}
 
-  throw StateError('aria2c was not found. Install aria2 and restart Geonode Download Manager.');
+/// Finds aria2c: override, bundled `bin/`, then PATH.
+Future<String> findAria2Executable({String override = ''}) async {
+  final candidates = Platform.isWindows
+      ? const ['aria2c.exe', 'aria2c']
+      : const ['aria2c'];
+
+  return resolveExecutable(
+    baseName: 'aria2c',
+    override: override,
+    notFoundMessage: 'aria2c was not found',
+    findOnPathFallback: () => _findOnPathByCandidates(candidates),
+  );
+}
+
+/// Finds yt-dlp: bundled `bin/`, then PATH.
+Future<String> findYtdlpExecutable({String override = ''}) async {
+  final candidates = Platform.isWindows
+      ? const ['yt-dlp.exe', 'yt-dlp']
+      : const ['yt-dlp'];
+
+  return resolveExecutable(
+    baseName: 'yt-dlp',
+    override: override,
+    notFoundMessage: 'yt-dlp was not found',
+    findOnPathFallback: () => _findOnPathByCandidates(candidates),
+  );
+}
+
+/// Finds ffmpeg: bundled `bin/`, then PATH.
+Future<String> findFfmpegExecutable({String override = ''}) async {
+  final candidates = Platform.isWindows
+      ? const ['ffmpeg.exe', 'ffmpeg']
+      : const ['ffmpeg'];
+
+  return resolveExecutable(
+    baseName: 'ffmpeg',
+    override: override,
+    notFoundMessage: 'ffmpeg was not found',
+    findOnPathFallback: () => _findOnPathByCandidates(candidates),
+  );
 }
 
 /// Returns true when [path] exists and looks runnable on this platform.

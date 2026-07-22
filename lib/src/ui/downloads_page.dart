@@ -70,12 +70,16 @@ class _DownloadTile extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Text(progressSummary(download)),
-                  for (final item in activity) ...[
-                    const SizedBox(width: 16),
-                    Text(item),
-                  ],
-                  const Spacer(),
+                  Expanded(
+                    child: Text(
+                      [
+                        progressSummary(download),
+                        ...activity,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   _Actions(download),
                 ],
               ),

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 const _engineChannel = MethodChannel(
-  'com.fhsinchy.geonode_download_manager/engine',
+  'com.geonode.geonode_download_manager/engine',
 );
 
 /// Opens a file, directory, or content URI with the platform default app.

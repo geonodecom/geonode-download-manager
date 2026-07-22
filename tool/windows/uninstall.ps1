@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "geonode-download-manager"
-$NativeHostName = "com.fhsinchy.geonode_download_manager"
+$NativeHostName = "com.geonode.geonode_download_manager"
 $ShortcutPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Geonode Download Manager.lnk"
 
 $RegistryKeys = @(

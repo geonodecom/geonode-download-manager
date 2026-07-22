@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -6,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/app_database.dart';
+import '../platform/bundled_executable.dart';
 import '../platform/executable_finder.dart';
 import '../providers.dart';
+import '../ytdlp/android_ffmpeg.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -49,26 +52,37 @@ class _SettingsForm extends ConsumerStatefulWidget {
 class _SettingsFormState extends ConsumerState<_SettingsForm> {
   late final TextEditingController _directory;
   late final TextEditingController _aria2Path;
+  late final TextEditingController _ytdlpPath;
+  late final TextEditingController _ffmpegPath;
   late int _maxActive;
   late int _split;
   late String _themeMode;
+  late String _youtubeFormatPreset;
   final List<_ValidationMessage> _messages = [];
   var _saving = false;
+  var _checkingBundledTools = false;
+  String? _bundledToolsStatus;
 
   @override
   void initState() {
     super.initState();
     _directory = TextEditingController(text: widget.settings.downloadDirectory);
     _aria2Path = TextEditingController(text: widget.settings.aria2Path);
+    _ytdlpPath = TextEditingController(text: widget.settings.ytdlpPath);
+    _ffmpegPath = TextEditingController(text: widget.settings.ffmpegPath);
     _maxActive = widget.settings.maxActiveDownloads;
     _split = widget.settings.defaultSplit;
     _themeMode = widget.settings.themeMode;
+    _youtubeFormatPreset = widget.settings.youtubeFormatPreset;
+    unawaited(_refreshBundledToolsStatus());
   }
 
   @override
   void dispose() {
     _directory.dispose();
     _aria2Path.dispose();
+    _ytdlpPath.dispose();
+    _ffmpegPath.dispose();
     super.dispose();
   }
 
@@ -105,11 +119,28 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
           TextField(
             controller: _aria2Path,
             decoration: const InputDecoration(
-              labelText: 'aria2 executable override',
-              hintText: 'Leave empty to use aria2c from PATH',
+              labelText: 'aria2 executable override (advanced)',
+              hintText: 'Leave empty to use bundled tools or PATH',
               helperText:
                   'Requires restarting Geonode Download Manager to take effect.',
             ),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Bundled download tools'),
+            subtitle: Text(
+              _bundledToolsStatus ?? 'Checking bundled tool status…',
+            ),
+            trailing: _checkingBundledTools
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    onPressed: _refreshBundledToolsStatus,
+                    icon: const Icon(Icons.refresh),
+                  ),
           ),
           const SizedBox(height: 16),
         ] else ...[
@@ -157,6 +188,68 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               .toList(),
           onChanged: (value) => setState(() => _split = value ?? 16),
         ),
+        const SizedBox(height: 16),
+        _SectionLabel(label: 'YouTube'),
+        const SizedBox(height: 8),
+        if (!isAndroid) ...[
+          TextField(
+            controller: _ytdlpPath,
+            decoration: const InputDecoration(
+              labelText: 'yt-dlp executable override (advanced)',
+              hintText: 'Leave empty to use bundled tools or PATH',
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ffmpegPath,
+            decoration: const InputDecoration(
+              labelText: 'ffmpeg executable override (advanced)',
+              hintText: 'Leave empty to use bundled tools or PATH',
+            ),
+          ),
+          const SizedBox(height: 16),
+        ] else ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('YouTube support'),
+            subtitle: Text(
+              _bundledToolsStatus ?? 'Checking YouTube status…',
+            ),
+            trailing: _checkingBundledTools
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    onPressed: _refreshBundledToolsStatus,
+                    icon: const Icon(Icons.refresh),
+                  ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        DropdownButtonFormField<String>(
+          initialValue: _youtubeFormatPreset,
+          decoration: const InputDecoration(
+            labelText: 'Default YouTube format',
+            helperText: 'Used when you add a YouTube link.',
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 'best_mp4',
+              child: Text('Best MP4'),
+            ),
+            DropdownMenuItem(
+              value: 'best',
+              child: Text('Best quality'),
+            ),
+            DropdownMenuItem(
+              value: 'audio_only',
+              child: Text('Audio only'),
+            ),
+          ],
+          onChanged: (value) =>
+              setState(() => _youtubeFormatPreset = value ?? 'best_mp4'),
+        ),
         const SizedBox(height: 20),
         _SectionLabel(label: 'Appearance'),
         const SizedBox(height: 8),
@@ -202,6 +295,44 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     if (path != null) _directory.text = path;
   }
 
+  Future<void> _refreshBundledToolsStatus() async {
+    setState(() => _checkingBundledTools = true);
+
+    if (Platform.isAndroid) {
+      final ready = await androidFfmpegAvailable();
+      if (!mounted) return;
+      setState(() {
+        _checkingBundledTools = false;
+        _bundledToolsStatus = ready
+            ? 'Built-in YouTube extractor ready; bundled ffmpeg available for '
+                'high-res merges.'
+            : 'Bundled ffmpeg (libffmpeg.so) missing. Run '
+                'tool/android/fetch_deps.ps1 before building.';
+      });
+      return;
+    }
+
+    final allReady = await desktopBundledToolsReady();
+    final aria2Ready = await aria2Available(override: _aria2Path.text.trim());
+    final youtubeReady = await desktopYoutubeToolsReady();
+
+    if (!mounted) return;
+    setState(() {
+      _checkingBundledTools = false;
+      if (allReady) {
+        _bundledToolsStatus =
+            'Bundled aria2, yt-dlp, and ffmpeg are ready in the install folder.';
+      } else if (aria2Ready && youtubeReady) {
+        _bundledToolsStatus =
+            'Download tools are available (bundled or PATH).';
+      } else {
+        _bundledToolsStatus =
+            'Some bundled tools are missing. Run tool/windows/fetch_deps.ps1 '
+            'or make fetch-deps, or set overrides below.';
+      }
+    });
+  }
+
   Future<void> _save() async {
     setState(() {
       _messages.clear();
@@ -215,6 +346,8 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               : widget.settings.downloadDirectory.trim())
         : _directory.text.trim();
     final aria2Path = isAndroid ? '' : _aria2Path.text.trim();
+    final ytdlpPath = isAndroid ? '' : _ytdlpPath.text.trim();
+    final ffmpegPath = isAndroid ? '' : _ffmpegPath.text.trim();
 
     if (!isAndroid) {
       if (directory.isEmpty) {
@@ -285,6 +418,48 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
           return;
         }
       }
+
+      for (final entry in [
+        ('yt-dlp', ytdlpPath),
+        ('ffmpeg', ffmpegPath),
+      ]) {
+        if (entry.$2.isEmpty) continue;
+        final file = File(entry.$2);
+        if (!await file.exists()) {
+          setState(() {
+            _messages.add(
+              _ValidationMessage.error(
+                '${entry.$1} executable was not found at "${entry.$2}".',
+              ),
+            );
+            _saving = false;
+          });
+          return;
+        }
+        if (!await isExecutablePath(entry.$2)) {
+          setState(() {
+            _messages.add(
+              _ValidationMessage.error('"${entry.$2}" is not executable.'),
+            );
+            _saving = false;
+          });
+          return;
+        }
+      }
+    } else {
+      final available = await androidFfmpegAvailable();
+      if (!available) {
+        setState(() {
+          _messages.add(
+            _ValidationMessage.error(
+              'Bundled ffmpeg (libffmpeg.so) is missing. '
+              'Run tool/android/fetch_deps.ps1 before building.',
+            ),
+          );
+          _saving = false;
+        });
+        return;
+      }
     }
 
     try {
@@ -296,6 +471,9 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               maxActiveDownloads: _maxActive,
               defaultSplit: _split,
               aria2Path: aria2Path,
+              ytdlpPath: ytdlpPath,
+              ffmpegPath: ffmpegPath,
+              youtubeFormatPreset: _youtubeFormatPreset,
               themeMode: _themeMode,
             ),
           );
@@ -311,8 +489,11 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     final engineChanged =
         _maxActive != widget.settings.maxActiveDownloads ||
         _split != widget.settings.defaultSplit ||
+        _youtubeFormatPreset != widget.settings.youtubeFormatPreset ||
         (!isAndroid &&
             (aria2Path != widget.settings.aria2Path ||
+                ytdlpPath != widget.settings.ytdlpPath ||
+                ffmpegPath != widget.settings.ffmpegPath ||
                 directory != widget.settings.downloadDirectory));
 
     setState(() {

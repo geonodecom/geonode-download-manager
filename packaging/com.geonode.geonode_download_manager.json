@@ -1,0 +1,7 @@
+{
+  "name": "com.geonode.geonode_download_manager",
+  "description": "Geonode Download Manager bridge",
+  "path": "GEONODE_HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://jfhajebjecphbdnocjaiomfegdjneikc/"]
+}

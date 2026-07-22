@@ -1,0 +1,91 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:geonode_download_manager/src/ytdlp/ytdlp_models.dart';
+
+void main() {
+  test('parses yt-dlp metadata and builds selectable formats', () {
+    final info = YtdlpVideoInfo.fromJson({
+      'id': 'abc123',
+      'title': 'Sample Video',
+      'duration': 125,
+      'formats': [
+        {
+          'format_id': '22',
+          'ext': 'mp4',
+          'width': 1280,
+          'height': 720,
+          'format_note': '720p',
+          'filesize': 1048576,
+          'vcodec': 'avc1',
+          'acodec': 'mp4a',
+          'format': '720p mp4',
+        },
+        {
+          'format_id': '137',
+          'ext': 'mp4',
+          'width': 1920,
+          'height': 1080,
+          'format_note': '1080p',
+          'filesize': 2097152,
+          'vcodec': 'avc1',
+          'acodec': 'none',
+          'format': '1080p video',
+        },
+        {
+          'format_id': '140',
+          'ext': 'm4a',
+          'format_note': 'medium',
+          'filesize': 524288,
+          'vcodec': 'none',
+          'acodec': 'mp4a',
+          'format': 'audio only',
+        },
+      ],
+    });
+
+    expect(info.title, 'Sample Video');
+    expect(info.duration, 125);
+
+    final selectable = info.selectableFormats();
+    expect(selectable, isNotEmpty);
+    expect(selectable.first.formatId, '22');
+    expect(
+      selectable.any((format) => format.formatId.contains('137+140')),
+      isTrue,
+    );
+    expect(
+      info.defaultFormatId(YoutubeFormatPreset.bestMp4),
+      '22',
+    );
+  });
+
+  test('sanitizes youtube filenames', () {
+    const options = YoutubeDownloadOptions(
+      formatId: '22',
+      title: 'Video: Test / Demo?',
+      ext: 'mp4',
+    );
+    expect(options.sanitizedFileName, 'Video_ Test _ Demo_.mp4');
+  });
+
+  test('parses flat playlist metadata', () {
+    final playlist = YtdlpPlaylistInfo.fromJson({
+      'id': 'PL123',
+      'title': 'My Playlist',
+      'entries': [
+        {'id': 'aaaaaaaaaaa', 'title': 'One'},
+        {
+          'id': 'bbbbbbbbbbb',
+          'title': 'Two',
+          'url': 'https://www.youtube.com/watch?v=bbbbbbbbbbb',
+        },
+        null,
+        {'id': '', 'title': 'Skip'},
+      ],
+    });
+
+    expect(playlist.title, 'My Playlist');
+    expect(playlist.entries, hasLength(2));
+    expect(playlist.entries.first.url, contains('aaaaaaaaaaa'));
+    expect(playlist.entries.last.title, 'Two');
+  });
+}
