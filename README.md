@@ -2,6 +2,14 @@
   <strong>Fast, opinionated download manager for desktop and Android.</strong>
 </p>
 
+<p align="center">
+  <img
+    src="geonode-donwload-manager-windows.png"
+    alt="Geonode Download Manager on Windows showing the Downloads screen"
+    width="720"
+  />
+</p>
+
 ## Status
 
 Geonode Download Manager is a Flutter app with **Linux**, **Windows**, and **Android**
@@ -33,19 +41,8 @@ Planned work (not shipped):
 - [ ] Video site download (YouTube, Dailymotion, Facebook)
 - [ ] Torrent / magnet support
 - [ ] Signed Play Store releases (production keystore in CI)
-- [ ] Automated Linux and Windows release artifacts in CI
-
-## Releasing
-
-Push a commit to `main` whose message contains a semver marker:
-
-```text
-RELEASE 0.2.0
-```
-
-That triggers the GitHub Actions release workflow, which builds a release Android
-APK, creates tag `v0.2.0`, and publishes a GitHub Release with the APK attached.
-Linux and Windows builds remain manual for now (see [Build](#build)).
+- [x] Automated Windows release zip in CI
+- [ ] Automated Linux release artifacts in CI
 
 ## Requirements
 
@@ -202,13 +199,6 @@ Outputs:
 Release builds currently sign with the debug keystore so local install works.
 Replace `signingConfig` in `android/app/build.gradle.kts` with your Play Store
 keystore before publishing.
-
-### Play Store notes
-
-- Declare the `dataSync` foreground service for active downloads.
-- Request `POST_NOTIFICATIONS` on Android 13+.
-- Disclose background/foreground download behavior in the Play Console data-safety form.
-- Direct HTTP(S) file downloads only; do not claim YouTube/streaming extraction support.
 
 ## Install Locally
 
