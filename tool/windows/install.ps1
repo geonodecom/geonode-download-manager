@@ -5,8 +5,8 @@ $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $InstallDir = Join-Path $env:LOCALAPPDATA "geonode-download-manager"
 $BundleDir = Join-Path $Root "build\windows\x64\runner\Release"
 $HostSrc = Join-Path $Root "build\geonode-download-manager-host.exe"
-$ManifestTemplate = Join-Path $Root "packaging\com.fhsinchy.geonode_download_manager.json"
-$NativeHostName = "com.fhsinchy.geonode_download_manager"
+$ManifestTemplate = Join-Path $Root "packaging\com.geonode.geonode_download_manager.json"
+$NativeHostName = "com.geonode.geonode_download_manager"
 
 if (-not (Test-Path (Join-Path $BundleDir "geonode-download-manager.exe"))) {
   Write-Host "Release bundle missing. Running build.ps1..."

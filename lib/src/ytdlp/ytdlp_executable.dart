@@ -126,7 +126,7 @@ class YtdlpExecutableResolver {
 
   static Future<String?> _defaultGetAndroidAbi() async {
     if (!Platform.isAndroid) return null;
-    const channel = MethodChannel('com.fhsinchy.geonode_download_manager/engine');
+    const channel = MethodChannel('com.geonode.geonode_download_manager/engine');
     try {
       final abi = await channel.invokeMethod<String>('getAbi');
       return abi;

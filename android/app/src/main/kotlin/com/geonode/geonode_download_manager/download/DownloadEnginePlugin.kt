@@ -1,4 +1,4 @@
-package com.fhsinchy.geonode_download_manager.download
+package com.geonode.geonode_download_manager.download
 
 import android.Manifest
 import android.content.Intent
@@ -25,11 +25,11 @@ class DownloadEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Eve
         appContext = binding.applicationContext
         methods = MethodChannel(
             binding.binaryMessenger,
-            "com.fhsinchy.geonode_download_manager/engine",
+            "com.geonode.geonode_download_manager/engine",
         )
         events = EventChannel(
             binding.binaryMessenger,
-            "com.fhsinchy.geonode_download_manager/engine_events",
+            "com.geonode.geonode_download_manager/engine_events",
         )
         methods.setMethodCallHandler(this)
         events.setStreamHandler(this)

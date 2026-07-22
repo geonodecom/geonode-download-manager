@@ -1,4 +1,4 @@
-package com.fhsinchy.geonode_download_manager.download
+package com.geonode.geonode_download_manager.download
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,8 +10,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.fhsinchy.geonode_download_manager.MainActivity
-import com.fhsinchy.geonode_download_manager.R
+import com.geonode.geonode_download_manager.MainActivity
+import com.geonode.geonode_download_manager.R
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors

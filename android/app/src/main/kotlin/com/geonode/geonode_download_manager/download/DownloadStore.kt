@@ -1,4 +1,4 @@
-package com.fhsinchy.geonode_download_manager.download
+package com.geonode.geonode_download_manager.download
 
 import android.content.Context
 import org.json.JSONArray

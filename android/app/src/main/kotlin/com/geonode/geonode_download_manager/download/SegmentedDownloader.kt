@@ -1,4 +1,4 @@
-package com.fhsinchy.geonode_download_manager.download
+package com.geonode.geonode_download_manager.download
 
 import java.io.File
 import java.io.RandomAccessFile

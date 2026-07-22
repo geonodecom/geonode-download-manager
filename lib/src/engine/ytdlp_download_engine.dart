@@ -59,7 +59,7 @@ class YtdlpDownloadEngine implements DownloadEngine {
     String displayName,
   ) async {
     if (!Platform.isAndroid) return null;
-    const channel = MethodChannel('com.fhsinchy.geonode_download_manager/engine');
+    const channel = MethodChannel('com.geonode.geonode_download_manager/engine');
     try {
       final uri = await channel.invokeMethod<String>('publishFile', {
         'sourcePath': sourcePath,

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.fhsinchy.geonode_download_manager"
+    namespace = "com.geonode.geonode_download_manager"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.fhsinchy.geonode_download_manager"
+        applicationId = "com.geonode.geonode_download_manager"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

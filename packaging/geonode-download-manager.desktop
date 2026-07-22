@@ -6,4 +6,4 @@ Exec=geonode-download-manager
 Icon=geonode-download-manager
 Terminal=false
 Categories=Network;FileTransfer;
-StartupWMClass=com.fhsinchy.geonode_download_manager
+StartupWMClass=com.geonode.geonode_download_manager

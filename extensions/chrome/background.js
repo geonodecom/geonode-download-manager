@@ -1,4 +1,4 @@
-const HOST_NAME = "com.fhsinchy.geonode_download_manager";
+const HOST_NAME = "com.geonode.geonode_download_manager";
 
 // --- Connection state ---
 // "host_unavailable" | "app_unavailable" | "ready"
