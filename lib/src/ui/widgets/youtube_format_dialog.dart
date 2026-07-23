@@ -20,12 +20,14 @@ Future<YoutubeFormatSelection?> showYoutubeFormatDialog(
   BuildContext context, {
   required YtdlpVideoInfo info,
   String? initialFormatId,
+  String dialogTitle = 'Choose YouTube format',
 }) {
   return showDialog<YoutubeFormatSelection>(
     context: context,
     builder: (_) => YoutubeFormatDialog(
       info: info,
       initialFormatId: initialFormatId,
+      dialogTitle: dialogTitle,
     ),
   );
 }
@@ -34,11 +36,13 @@ class YoutubeFormatDialog extends StatefulWidget {
   const YoutubeFormatDialog({
     required this.info,
     this.initialFormatId,
+    this.dialogTitle = 'Choose YouTube format',
     super.key,
   });
 
   final YtdlpVideoInfo info;
   final String? initialFormatId;
+  final String dialogTitle;
 
   @override
   State<YoutubeFormatDialog> createState() => _YoutubeFormatDialogState();
@@ -62,7 +66,7 @@ class _YoutubeFormatDialogState extends State<YoutubeFormatDialog> {
     final durationLabel = duration > 0 ? _formatDuration(duration) : null;
 
     return AlertDialog(
-      title: const Text('Choose YouTube format'),
+      title: Text(widget.dialogTitle),
       content: SizedBox(
         width: 560,
         child: _formats.isEmpty

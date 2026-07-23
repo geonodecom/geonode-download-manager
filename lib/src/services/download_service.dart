@@ -9,6 +9,7 @@ import '../aria2/aria2_models.dart';
 import '../data/app_database.dart';
 import '../data/download_repository.dart';
 import '../engine/download_engine.dart';
+import '../facebook/facebook_models.dart';
 import '../ytdlp/ytdlp_models.dart';
 import 'diagnostics.dart';
 import 'download_probe.dart';
@@ -239,7 +240,7 @@ class DownloadService {
     final downloads = await _repository.listQueuedMissingMetadata();
     for (final download in downloads) {
       if (!_metadataProbeAttempts.add(download.id)) continue;
-      if (isYoutubeDownloadOptions(download.optionsJson)) continue;
+      if (isExtractorDownloadOptions(download.optionsJson)) continue;
       final metadata = await _probe.probe(
         NewDownload(
           url: download.url,
@@ -353,7 +354,9 @@ class DownloadService {
   }
 
   bool _shouldProbe(NewDownload input) {
-    if (input.options['kind']?.toString() == YoutubeDownloadOptions.kind) {
+    final kind = input.options['kind']?.toString();
+    if (kind == YoutubeDownloadOptions.kind ||
+        kind == FacebookDownloadOptions.kind) {
       return false;
     }
     return UrlClassifier.classify(input.url) == DownloadUrlKind.direct;

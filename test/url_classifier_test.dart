@@ -133,5 +133,47 @@ void main() {
         DownloadUrlKind.direct,
       );
     });
+
+    test('detects facebook hosts and paths', () {
+      expect(
+        UrlClassifier.classify(
+          'https://www.facebook.com/watch/?v=1234567890',
+        ),
+        DownloadUrlKind.facebook,
+      );
+      expect(
+        UrlClassifier.classify('https://fb.watch/abcXYZ12'),
+        DownloadUrlKind.facebook,
+      );
+      expect(
+        UrlClassifier.classify(
+          'https://www.facebook.com/reel/123456789012345',
+        ),
+        DownloadUrlKind.facebook,
+      );
+      expect(
+        UrlClassifier.classify('facebook.com/watch/?v=99'),
+        DownloadUrlKind.facebook,
+      );
+    });
+
+    test('normalizeFacebookUrl canonicalizes watch and reel links', () {
+      expect(
+        UrlClassifier.normalizeFacebookUrl(
+          'https://m.facebook.com/watch/?v=1234567890&ref=share',
+        ),
+        'https://www.facebook.com/watch/?v=1234567890',
+      );
+      expect(
+        UrlClassifier.normalizeFacebookUrl(
+          'https://www.facebook.com/reel/9876543210/?s=single',
+        ),
+        'https://www.facebook.com/reel/9876543210',
+      );
+      expect(
+        UrlClassifier.normalizeFacebookUrl('https://fb.watch/AbCdEfG'),
+        'https://fb.watch/AbCdEfG',
+      );
+    });
   });
 }

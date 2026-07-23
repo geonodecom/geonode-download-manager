@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import '../aria2/aria2_models.dart';
+import '../facebook/facebook_models.dart';
 import '../ytdlp/ytdlp_models.dart';
 import 'download_engine.dart';
 import 'ytdlp_download_engine.dart';
@@ -16,8 +19,18 @@ class CompositeDownloadEngine implements DownloadEngine {
 
   DownloadEngine get youtubeEngine => _youtubeEngine;
 
+  static const _facebookReferer = 'https://www.facebook.com/';
+  static const _facebookUserAgent =
+      'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
   DownloadEngine _engineForOptions(Map<String, Object?>? optionsJson) {
-    if (optionsJson?['kind']?.toString() == YoutubeDownloadOptions.kind) {
+    final kind = optionsJson?['kind']?.toString();
+    if (kind == YoutubeDownloadOptions.kind) {
+      return _youtubeEngine;
+    }
+    // Desktop Facebook uses yt-dlp; Android resolves a CDN URL and uses HTTP.
+    if (kind == FacebookDownloadOptions.kind && !Platform.isAndroid) {
       return _youtubeEngine;
     }
     return _baseEngine;
@@ -80,6 +93,29 @@ class CompositeDownloadEngine implements DownloadEngine {
     int? position,
     Map<String, Object?>? optionsJson,
   }) {
+    final kind = optionsJson?['kind']?.toString();
+    if (kind == FacebookDownloadOptions.kind && Platform.isAndroid) {
+      final directUrl = optionsJson?['directUrl']?.toString() ?? '';
+      if (directUrl.isEmpty) {
+        throw StateError(
+          'Facebook download on Android requires a progressive CDN URL.',
+        );
+      }
+      return _baseEngine.addUri(
+        url: directUrl,
+        directory: directory,
+        split: split,
+        fileName: fileName,
+        headers: {
+          ...headers,
+          'Referer': _facebookReferer,
+          'User-Agent': _facebookUserAgent,
+        },
+        position: position,
+        optionsJson: optionsJson,
+      );
+    }
+
     return _engineForOptions(optionsJson).addUri(
       url: url,
       directory: directory,

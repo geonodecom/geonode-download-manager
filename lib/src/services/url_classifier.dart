@@ -1,6 +1,6 @@
-enum DownloadUrlKind { direct, youtube, youtubePlaylist }
+enum DownloadUrlKind { direct, youtube, youtubePlaylist, facebook }
 
-/// Classifies download URLs for routing to direct HTTP or yt-dlp extractors.
+/// Classifies download URLs for routing to direct HTTP or extractors.
 class UrlClassifier {
   const UrlClassifier._();
 
@@ -14,7 +14,17 @@ class UrlClassifier {
     'www.youtube-nocookie.com',
   };
 
-  /// Trims and, for bare YouTube hosts, prepends `https://`.
+  static const _facebookHosts = {
+    'facebook.com',
+    'www.facebook.com',
+    'm.facebook.com',
+    'web.facebook.com',
+    'fb.watch',
+    'fb.com',
+    'www.fb.com',
+  };
+
+  /// Trims and, for bare known hosts, prepends `https://`.
   static String normalizeInputUrl(String raw) {
     var text = raw.trim();
     // Strip zero-width / BOM characters that break Uri host parsing on paste.
@@ -25,7 +35,11 @@ class UrlClassifier {
       final hostCandidate = text.split('/').first.split('?').first.toLowerCase();
       if (_youtubeHosts.contains(hostCandidate) ||
           hostCandidate.endsWith('.youtube.com') ||
-          hostCandidate == 'youtu.be') {
+          hostCandidate == 'youtu.be' ||
+          _facebookHosts.contains(hostCandidate) ||
+          hostCandidate.endsWith('.facebook.com') ||
+          hostCandidate == 'fb.watch' ||
+          hostCandidate == 'fb.com') {
         text = 'https://$text';
       }
     }
@@ -40,6 +54,11 @@ class UrlClassifier {
     }
 
     final host = uri.host.toLowerCase();
+
+    if (_isFacebookHost(host)) {
+      return DownloadUrlKind.facebook;
+    }
+
     if (!_isYoutubeHost(host)) {
       return DownloadUrlKind.direct;
     }
@@ -61,6 +80,8 @@ class UrlClassifier {
   static bool isYoutubePlaylist(String url) {
     return classify(url) == DownloadUrlKind.youtubePlaylist;
   }
+
+  static bool isFacebook(String url) => classify(url) == DownloadUrlKind.facebook;
 
   /// Extracts an 11-character YouTube video id when present.
   static String? extractYoutubeVideoId(String url) {
@@ -105,8 +126,67 @@ class UrlClassifier {
     return normalized;
   }
 
+  /// Stable https Facebook URL for extractors.
+  static String normalizeFacebookUrl(String url) {
+    final normalized = normalizeInputUrl(url);
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || !_isFacebookHost(uri.host.toLowerCase())) {
+      return normalized;
+    }
+
+    final host = uri.host.toLowerCase();
+    final segments = uri.pathSegments;
+
+    if (host == 'fb.watch' && segments.isNotEmpty) {
+      final code = segments.first;
+      if (code.isNotEmpty) {
+        return 'https://fb.watch/$code';
+      }
+    }
+
+    final path = uri.path;
+    final lowerPath = path.toLowerCase();
+
+    // /watch/?v=ID or /watch?v=ID
+    final watchId = uri.queryParameters['v'] ?? uri.queryParameters['vd'];
+    if (lowerPath.contains('/watch') && watchId != null && watchId.isNotEmpty) {
+      return 'https://www.facebook.com/watch/?v=$watchId';
+    }
+
+    // /reel/ID or /reels/ID
+    final reelMatch = RegExp(r'/reels?/([^/?#]+)', caseSensitive: false)
+        .firstMatch(path);
+    if (reelMatch != null) {
+      return 'https://www.facebook.com/reel/${reelMatch.group(1)}';
+    }
+
+    // /videos/ID or /username/videos/ID
+    final videosMatch = RegExp(
+      r'/videos/(?:[^/]+/)?(\d+)',
+      caseSensitive: false,
+    ).firstMatch(path);
+    if (videosMatch != null) {
+      return 'https://www.facebook.com/watch/?v=${videosMatch.group(1)}';
+    }
+
+    // Prefer www host for facebook.com variants.
+    if (host == 'facebook.com' ||
+        host == 'm.facebook.com' ||
+        host == 'web.facebook.com' ||
+        host == 'fb.com' ||
+        host == 'www.fb.com') {
+      return uri.replace(scheme: 'https', host: 'www.facebook.com').toString();
+    }
+
+    return uri.replace(scheme: 'https').toString();
+  }
+
   static bool _isYoutubeHost(String host) {
     return _youtubeHosts.contains(host) || host.endsWith('.youtube.com');
+  }
+
+  static bool _isFacebookHost(String host) {
+    return _facebookHosts.contains(host) || host.endsWith('.facebook.com');
   }
 
   static bool _isPlaylistOnly(Uri uri) {

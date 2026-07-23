@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../aria2/aria2_models.dart';
+import '../facebook/facebook_models.dart';
 import '../ytdlp/ytdlp_executable.dart';
 import '../ytdlp/ytdlp_models.dart';
 import '../ytdlp/ytdlp_progress.dart';
@@ -108,9 +109,9 @@ class YtdlpDownloadEngine implements DownloadEngine {
     int? position,
     Map<String, Object?>? optionsJson,
   }) async {
-    final options = _youtubeOptions(optionsJson);
+    final options = _extractorOptions(optionsJson);
     if (options == null) {
-      throw StateError('YouTube engine requires youtube options.');
+      throw StateError('yt-dlp engine requires youtube or facebook options.');
     }
 
     final gid = 'ytdlp:${const Uuid().v4()}';
@@ -246,19 +247,24 @@ class YtdlpDownloadEngine implements DownloadEngine {
       job.process = await Process.start(
         binaries.ytdlpPath,
         args,
-        runInShell: Platform.isWindows,
+        environment: const {
+          'PYTHONIOENCODING': 'utf-8',
+          'PYTHONUTF8': '1',
+        },
+        includeParentEnvironment: true,
       );
 
       final stderrBuffer = StringBuffer();
+      const decoder = Utf8Decoder(allowMalformed: true);
       final stdoutDone = job.process!.stdout
-          .transform(utf8.decoder)
+          .transform(decoder)
           .transform(const LineSplitter())
           .map((line) {
             _applyProgressLine(job, line);
           })
           .drain();
       final stderrDone = job.process!.stderr
-          .transform(utf8.decoder)
+          .transform(decoder)
           .transform(const LineSplitter())
           .map((line) {
             stderrBuffer.writeln(line);
@@ -354,11 +360,20 @@ class YtdlpDownloadEngine implements DownloadEngine {
     );
   }
 
-  YoutubeDownloadOptions? _youtubeOptions(Map<String, Object?>? optionsJson) {
+  YoutubeDownloadOptions? _extractorOptions(Map<String, Object?>? optionsJson) {
     if (optionsJson == null) return null;
-    if (optionsJson['kind']?.toString() != YoutubeDownloadOptions.kind) {
-      return null;
+    final kind = optionsJson['kind']?.toString();
+    if (kind == YoutubeDownloadOptions.kind) {
+      return YoutubeDownloadOptions.fromJson(optionsJson);
     }
-    return YoutubeDownloadOptions.fromJson(optionsJson);
+    if (kind == FacebookDownloadOptions.kind) {
+      final facebook = FacebookDownloadOptions.fromJson(optionsJson);
+      return YoutubeDownloadOptions(
+        formatId: facebook.formatId,
+        title: facebook.title,
+        ext: facebook.ext,
+      );
+    }
+    return null;
   }
 }

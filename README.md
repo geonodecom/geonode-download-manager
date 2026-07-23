@@ -17,9 +17,9 @@ targets. Desktop builds use system `aria2c`. Android uses a native foreground
 service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
 
-The app focuses on direct HTTP/HTTPS file downloads, YouTube video extraction,
-queueing, resume, and useful download details. Torrent downloads are not
-implemented yet; see [Roadmap](#roadmap).
+The app focuses on direct HTTP/HTTPS file downloads, YouTube and public Facebook
+video extraction, queueing, resume, and useful download details. Torrent downloads
+are not implemented yet; see [Roadmap](#roadmap).
 
 ## Features
 
@@ -35,13 +35,14 @@ implemented yet; see [Roadmap](#roadmap).
 - [x] Android share / open-with intake for direct HTTP(S) URLs
 - [x] YouTube video download with format selection (desktop: yt-dlp + ffmpeg; Android: built-in extractor)
 - [x] YouTube playlists (queue each entry) and common URL styles (watch, Shorts, live, embed, music, youtu.be)
+- [x] Public Facebook / fb.watch video download (desktop: yt-dlp; Android: progressive CDN extraction + HTTP)
 
 ## Roadmap
 
 Planned work (not shipped):
 
 - [ ] YouTube authenticated / private streams and channel pages
-- [ ] More video sites (Dailymotion, Facebook)
+- [ ] Facebook login / private videos and more sites (Dailymotion, …)
 - [ ] Torrent / magnet support
 - [ ] Signed Play Store releases (production keystore in CI)
 - [x] Automated Windows release zip in CI
@@ -51,7 +52,7 @@ Planned work (not shipped):
 
 ### End users (release installs)
 
-Install **only GeoNode Download Manager**. Official Windows zip releases bundle
+Install **only Geonode Download Manager**. Official Windows zip releases bundle
 **aria2**, **yt-dlp**, and **ffmpeg**. Android APKs use a native download service
 for HTTP, a built-in YouTube extractor, and bundled **ffmpeg** (`libffmpeg.so`)
 for high-resolution merges — no separate tool installs required.
@@ -109,9 +110,10 @@ sudo apt install python3 clang cmake ninja-build pkg-config libgtk-3-dev libstdc
 Android direct HTTP downloads run in `DownloadForegroundService`. YouTube on
 Android uses `youtube_explode_dart` for metadata/streams and bundled ffmpeg
 (`libffmpeg.so`) to merge high-resolution video+audio (same style of format
-list as desktop). APK size grows substantially because static ffmpeg is
-packaged per ABI. YouTube downloading may conflict with Play Store policy;
-sideload/dev builds are the safest target for now.
+list as desktop). Public Facebook videos are resolved to progressive CDN MP4
+URLs and downloaded over HTTP (no yt-dlp process). APK size grows substantially
+because static ffmpeg is packaged per ABI. YouTube downloading may conflict
+with Play Store policy; sideload/dev builds are the safest target for now.
 
 ## Development
 
