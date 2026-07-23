@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -7,10 +8,14 @@ import 'bundled_executable.dart';
 /// Locates an executable on PATH using a platform-appropriate tool.
 Future<String?> findOnPath(String name) async {
   if (Platform.isWindows) {
-    final result = await Process.run('where', [name]);
+    final result = await Process.run(
+      'where',
+      [name],
+      stdoutEncoding: null,
+      stderrEncoding: null,
+    );
     if (result.exitCode != 0) return null;
-    final lines = result.stdout
-        .toString()
+    final lines = _decodeProcessOutput(result.stdout)
         .split(RegExp(r'\r?\n'))
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty);
@@ -20,12 +25,30 @@ Future<String?> findOnPath(String name) async {
     return null;
   }
 
-  final result = await Process.run('which', [name]);
+  final result = await Process.run(
+    'which',
+    [name],
+    stdoutEncoding: null,
+    stderrEncoding: null,
+  );
   if (result.exitCode != 0) return null;
-  final path = result.stdout.toString().trim();
+  final path = _decodeProcessOutput(result.stdout).trim();
   if (path.isEmpty) return null;
   if (!await File(path).exists()) return null;
   return path;
+}
+
+String _decodeProcessOutput(Object? output) {
+  if (output == null) return '';
+  if (output is String) return output;
+  if (output is List<int>) {
+    try {
+      return utf8.decode(output, allowMalformed: true);
+    } catch (_) {
+      return latin1.decode(output);
+    }
+  }
+  return output.toString();
 }
 
 Future<String> _findOnPathByCandidates(List<String> candidates) async {

@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/download_repository.dart';
 import '../../extension/download_capture.dart';
+import '../../facebook/facebook_metadata_client.dart';
+import '../../facebook/facebook_models.dart';
 import '../../providers.dart';
 import '../../services/download_service.dart';
 import '../../services/url_classifier.dart';
@@ -94,6 +96,10 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
         kind == DownloadUrlKind.youtubePlaylist;
   }
 
+  bool get _isFacebookFlow => _urlKind == DownloadUrlKind.facebook;
+
+  bool get _isExtractorFlow => _isYoutubeFlow || _isFacebookFlow;
+
   @override
   Widget build(BuildContext context) {
     final isAndroid = Platform.isAndroid;
@@ -114,7 +120,8 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'URL',
-                  hintText: 'https://example.com/file.iso or YouTube link',
+                  hintText:
+                      'https://example.com/file.iso, YouTube, or Facebook link',
                 ),
               ),
               if (widget.capture != null) ...[
@@ -133,10 +140,10 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _fileName,
-                enabled: !_submitting && !_isYoutubeFlow,
+                enabled: !_submitting && !_isExtractorFlow,
                 decoration: InputDecoration(
                   labelText: 'Filename override',
-                  hintText: _isYoutubeFlow
+                  hintText: _isExtractorFlow
                       ? 'Set after choosing format'
                       : 'Optional',
                 ),
@@ -146,30 +153,41 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    _isYoutubeFlow
-                        ? 'YouTube videos are extracted and saved to Downloads.'
-                        : 'Files are saved to the system Downloads folder.',
+                    _androidHelpText(),
                     style: const TextStyle(fontSize: 12),
                   ),
                 )
               else
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _directory,
-                        enabled: !_submitting,
-                        decoration: const InputDecoration(labelText: 'Save to'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _directory,
+                            enabled: !_submitting,
+                            decoration:
+                                const InputDecoration(labelText: 'Save to'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonal(
+                          onPressed: _submitting ? null : _pickDirectory,
+                          child: const Text('Browse'),
+                        ),
+                      ],
+                    ),
+                    if (_isFacebookFlow) ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Public Facebook videos only (extracted with yt-dlp).',
+                        style: TextStyle(fontSize: 12),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.tonal(
-                      onPressed: _submitting ? null : _pickDirectory,
-                      child: const Text('Browse'),
-                    ),
+                    ],
                   ],
                 ),
-              if (!_isYoutubeFlow) ...[
+              if (!_isExtractorFlow) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -243,6 +261,7 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
                   switch (kind) {
                     DownloadUrlKind.youtube => 'Choose format',
                     DownloadUrlKind.youtubePlaylist => 'Queue playlist',
+                    DownloadUrlKind.facebook => 'Choose format',
                     DownloadUrlKind.direct => 'Add',
                   },
                 ),
@@ -260,7 +279,10 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     final raw = _url.text.trim();
     final url = UrlClassifier.normalizeInputUrl(raw);
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      setState(() => _error = 'Geonode supports HTTP, HTTPS, and YouTube URLs.');
+      setState(
+        () => _error =
+            'Geonode supports HTTP, HTTPS, YouTube, and Facebook URLs.',
+      );
       return;
     }
 
@@ -273,8 +295,22 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
       await _submitYoutubePlaylist(url);
       return;
     }
+    if (kind == DownloadUrlKind.facebook) {
+      await _submitFacebook(UrlClassifier.normalizeFacebookUrl(url));
+      return;
+    }
 
     await _submitDirect(url);
+  }
+
+  String _androidHelpText() {
+    if (_isYoutubeFlow) {
+      return 'YouTube videos are extracted and saved to Downloads.';
+    }
+    if (_isFacebookFlow) {
+      return 'Public Facebook videos only. Progressive MP4 is saved to Downloads.';
+    }
+    return 'Files are saved to the system Downloads folder.';
   }
 
   Future<YoutubeMetadataClient> _youtubeClient() async {
@@ -506,6 +542,146 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     }
   }
 
+  Future<void> _submitFacebook(String url) async {
+    setState(() {
+      _error = null;
+      _submitting = true;
+    });
+
+    final settings = await ref.read(downloadRepositoryProvider).getSettings();
+    late final YtdlpVideoInfo info;
+    late final Map<String, String> progressiveUrls;
+
+    if (Platform.isAndroid) {
+      final client = FacebookMetadataClient();
+      try {
+        final result = await client.fetchInfo(url);
+        info = result.info;
+        progressiveUrls = result.progressiveUrls;
+      } on YtdlpException catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = error.message;
+            _submitting = false;
+          });
+        }
+        return;
+      } catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = error.toString();
+            _submitting = false;
+          });
+        }
+        return;
+      } finally {
+        client.close();
+      }
+    } else {
+      final client = await _youtubeClient();
+      if (!await _ensureYoutubeTools(client)) return;
+      progressiveUrls = const {};
+      try {
+        info = await client.fetchInfo(url);
+      } on YtdlpException catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = _friendlyFacebookDesktopError(error.message);
+            _submitting = false;
+          });
+        }
+        return;
+      } on FormatException catch (error) {
+        if (mounted) {
+          setState(() {
+            _error =
+                'Could not read yt-dlp output for this Facebook video '
+                '(encoding error). Try again, or update yt-dlp. ($error)';
+            _submitting = false;
+          });
+        }
+        return;
+      } catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = error.toString();
+            _submitting = false;
+          });
+        }
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    final preset = presetFromStorage(settings.youtubeFormatPreset);
+    final selection = await showYoutubeFormatDialog(
+      context,
+      info: info,
+      initialFormatId: info.defaultFormatId(preset),
+      dialogTitle: 'Choose Facebook format',
+    );
+    if (selection == null || !mounted) return;
+
+    setState(() {
+      _error = null;
+      _submitting = true;
+    });
+
+    try {
+      final directory = await resolveYtdlpDownloadDirectory(
+        Platform.isAndroid ? 'Downloads' : _directory.text.trim(),
+      );
+      final directUrl = progressiveUrls[selection.formatId] ?? '';
+      if (Platform.isAndroid && directUrl.isEmpty) {
+        throw StateError('Selected Facebook format has no progressive URL.');
+      }
+      final options = FacebookDownloadOptions(
+        formatId: selection.formatId,
+        title: selection.title,
+        ext: selection.ext,
+        directUrl: directUrl,
+      );
+      await ref.read(downloadServiceProvider).addDownload(
+            NewDownload(
+              url: url,
+              directory: directory,
+              fileName: selection.fileName,
+              split: Platform.isAndroid ? _split : 1,
+              startImmediately: _startImmediately,
+              metadata: DownloadMetadata(
+                fileName: selection.fileName,
+                totalLength: 0,
+              ),
+              headers: widget.capture?.headers ?? const {},
+              source: _facebookSource(),
+              options: options.toJson(),
+            ),
+          );
+      if (mounted) Navigator.of(context).pop();
+    } catch (err) {
+      if (mounted) {
+        setState(() {
+          _error = err.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  String _friendlyFacebookDesktopError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('login') ||
+        lower.contains('cookie') ||
+        lower.contains('private') ||
+        lower.contains('unavailable')) {
+      return 'Could not extract this Facebook video. '
+          'Only public videos are supported (no login). Details: $message';
+    }
+    return message;
+  }
+
   Future<void> _submitDirect(String url) async {
     final directory = Platform.isAndroid
         ? (_directory.text.trim().isEmpty ? 'Downloads' : _directory.text.trim())
@@ -546,6 +722,13 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     return widget.capture!.source == 'browser_extension'
         ? 'youtube_extension'
         : 'youtube_share';
+  }
+
+  String _facebookSource() {
+    if (widget.capture == null) return 'facebook';
+    return widget.capture!.source == 'browser_extension'
+        ? 'facebook_extension'
+        : 'facebook_share';
   }
 
   String _captureLabel(DownloadCapture capture) {

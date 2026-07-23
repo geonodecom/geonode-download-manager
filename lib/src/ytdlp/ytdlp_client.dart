@@ -26,6 +26,11 @@ class YtdlpClient implements YoutubeMetadataClient {
   final String ytdlpOverride;
   final String ffmpegOverride;
 
+  static final Map<String, String> _utf8ProcessEnvironment = {
+    'PYTHONIOENCODING': 'utf-8',
+    'PYTHONUTF8': '1',
+  };
+
   @override
   Future<bool> checkHealth() {
     return _resolver.areAvailable(
@@ -41,16 +46,13 @@ class YtdlpClient implements YoutubeMetadataClient {
       ffmpegOverride: ffmpegOverride,
     );
 
-    final result = await Process.run(
-      binaries.ytdlpPath,
-      [
-        '--no-playlist',
-        '--dump-single-json',
-        '--skip-download',
-        url,
-      ],
-      runInShell: Platform.isWindows,
-    );
+    final result = await _runYtdlp(binaries.ytdlpPath, [
+      '--no-playlist',
+      '--dump-single-json',
+      '--skip-download',
+      '--no-warnings',
+      url,
+    ]);
 
     if (result.exitCode != 0) {
       throw YtdlpException(
@@ -59,7 +61,7 @@ class YtdlpClient implements YoutubeMetadataClient {
       );
     }
 
-    final stdout = result.stdout.toString().trim();
+    final stdout = _decodeOutput(result.stdout).trim();
     if (stdout.isEmpty) {
       throw YtdlpException('yt-dlp returned no metadata for this URL.');
     }
@@ -79,16 +81,13 @@ class YtdlpClient implements YoutubeMetadataClient {
       ffmpegOverride: ffmpegOverride,
     );
 
-    final result = await Process.run(
-      binaries.ytdlpPath,
-      [
-        '--flat-playlist',
-        '--dump-single-json',
-        '--skip-download',
-        url,
-      ],
-      runInShell: Platform.isWindows,
-    );
+    final result = await _runYtdlp(binaries.ytdlpPath, [
+      '--flat-playlist',
+      '--dump-single-json',
+      '--skip-download',
+      '--no-warnings',
+      url,
+    ]);
 
     if (result.exitCode != 0) {
       throw YtdlpException(
@@ -97,7 +96,7 @@ class YtdlpClient implements YoutubeMetadataClient {
       );
     }
 
-    final stdout = result.stdout.toString().trim();
+    final stdout = _decodeOutput(result.stdout).trim();
     if (stdout.isEmpty) {
       throw YtdlpException('yt-dlp returned no playlist metadata for this URL.');
     }
@@ -114,9 +113,36 @@ class YtdlpClient implements YoutubeMetadataClient {
     return playlist;
   }
 
+  Future<ProcessResult> _runYtdlp(String ytdlpPath, List<String> args) {
+    // Avoid cmd.exe on Windows (encoding issues). Resolver returns absolute paths.
+    // Receive raw bytes so we control decoding and never throw FormatException.
+    return Process.run(
+      ytdlpPath,
+      args,
+      environment: _utf8ProcessEnvironment,
+      includeParentEnvironment: true,
+      stdoutEncoding: null,
+      stderrEncoding: null,
+    );
+  }
+
   String _stderrMessage(ProcessResult result) {
-    final stderr = result.stderr.toString().trim();
+    final stderr = _decodeOutput(result.stderr).trim();
     if (stderr.isNotEmpty) return stderr;
     return 'yt-dlp failed with exit code ${result.exitCode}.';
+  }
+
+  /// Decodes process output without throwing on invalid UTF-8.
+  static String _decodeOutput(Object? output) {
+    if (output == null) return '';
+    if (output is String) return output;
+    if (output is List<int>) {
+      try {
+        return utf8.decode(output, allowMalformed: true);
+      } catch (_) {
+        return latin1.decode(output);
+      }
+    }
+    return output.toString();
   }
 }
