@@ -88,4 +88,32 @@ void main() {
     expect(playlist.entries.first.url, contains('aaaaaaaaaaa'));
     expect(playlist.entries.last.title, 'Two');
   });
+
+  test('treats Facebook progressive formats without codecs as selectable', () {
+    final info = YtdlpVideoInfo.fromJson({
+      'id': '400089874377628',
+      'title': 'Facebook Reel',
+      'duration': 12,
+      'formats': [
+        {
+          'format_id': 'hd',
+          'ext': 'mp4',
+          'format_note': 'HD',
+          'url': 'https://video.xx.fbcdn.net/v/t66/hd.mp4',
+        },
+        {
+          'format_id': 'sd',
+          'ext': 'mp4',
+          'format_note': 'SD',
+          'url': 'https://video.xx.fbcdn.net/v/t66/sd.mp4',
+        },
+      ],
+    });
+
+    final selectable = info.selectableFormats();
+    expect(selectable, isNotEmpty);
+    expect(selectable.map((f) => f.formatId), containsAll(['hd', 'sd']));
+    expect(selectable.first.isCombined, isTrue);
+    expect(info.defaultFormatId(YoutubeFormatPreset.bestMp4), isNotNull);
+  });
 }

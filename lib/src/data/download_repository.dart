@@ -405,6 +405,14 @@ class DownloadRepository {
           key: 'theme_mode',
           value: settings.themeMode,
         ),
+        AppSettingsCompanion.insert(
+          key: 'facebook_cookies_path',
+          value: settings.facebookCookiesPath,
+        ),
+        AppSettingsCompanion.insert(
+          key: 'facebook_cookies_from_browser',
+          value: settings.facebookCookiesFromBrowser,
+        ),
       ]);
     });
   }
@@ -423,6 +431,8 @@ class DownloadRepository {
         ffmpegPath: '',
         youtubeFormatPreset: 'best_mp4',
         themeMode: 'system',
+        facebookCookiesPath: '',
+        facebookCookiesFromBrowser: '',
       ),
     );
   }
@@ -445,6 +455,9 @@ class DownloadRepository {
       ffmpegPath: values['ffmpeg_path'] ?? '',
       youtubeFormatPreset: values['youtube_format_preset'] ?? 'best_mp4',
       themeMode: values['theme_mode'] ?? 'system',
+      facebookCookiesPath: values['facebook_cookies_path'] ?? '',
+      facebookCookiesFromBrowser:
+          values['facebook_cookies_from_browser'] ?? '',
     );
   }
 }

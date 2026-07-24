@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../facebook/facebook_session.dart';
 import 'youtube_metadata_client.dart';
 import 'ytdlp_executable.dart';
 import 'ytdlp_models.dart';
@@ -20,11 +21,16 @@ class YtdlpClient implements YoutubeMetadataClient {
     YtdlpExecutableResolver? resolver,
     this.ytdlpOverride = '',
     this.ffmpegOverride = '',
-  }) : _resolver = resolver ?? YtdlpExecutableResolver();
+    this.facebookCookieArgs = const FacebookCookieArgs(),
+    FacebookSession? facebookSession,
+  }) : _resolver = resolver ?? YtdlpExecutableResolver(),
+       _facebookSession = facebookSession ?? FacebookSession();
 
   final YtdlpExecutableResolver _resolver;
   final String ytdlpOverride;
   final String ffmpegOverride;
+  final FacebookCookieArgs facebookCookieArgs;
+  final FacebookSession _facebookSession;
 
   static final Map<String, String> _utf8ProcessEnvironment = {
     'PYTHONIOENCODING': 'utf-8',
@@ -51,12 +57,13 @@ class YtdlpClient implements YoutubeMetadataClient {
       '--dump-single-json',
       '--skip-download',
       '--no-warnings',
+      ...await _cookieArgs(url),
       url,
     ]);
 
     if (result.exitCode != 0) {
       throw YtdlpException(
-        _stderrMessage(result),
+        _friendlyAuthMessage(_stderrMessage(result)),
         exitCode: result.exitCode,
       );
     }
@@ -86,12 +93,13 @@ class YtdlpClient implements YoutubeMetadataClient {
       '--dump-single-json',
       '--skip-download',
       '--no-warnings',
+      ...await _cookieArgs(url),
       url,
     ]);
 
     if (result.exitCode != 0) {
       throw YtdlpException(
-        _stderrMessage(result),
+        _friendlyAuthMessage(_stderrMessage(result)),
         exitCode: result.exitCode,
       );
     }
@@ -113,9 +121,15 @@ class YtdlpClient implements YoutubeMetadataClient {
     return playlist;
   }
 
+  Future<List<String>> _cookieArgs(String url) {
+    return resolveYtdlpFacebookCookieArgs(
+      settings: facebookCookieArgs,
+      session: _facebookSession,
+      url: url,
+    );
+  }
+
   Future<ProcessResult> _runYtdlp(String ytdlpPath, List<String> args) {
-    // Avoid cmd.exe on Windows (encoding issues). Resolver returns absolute paths.
-    // Receive raw bytes so we control decoding and never throw FormatException.
     return Process.run(
       ytdlpPath,
       args,
@@ -132,7 +146,19 @@ class YtdlpClient implements YoutubeMetadataClient {
     return 'yt-dlp failed with exit code ${result.exitCode}.';
   }
 
-  /// Decodes process output without throwing on invalid UTF-8.
+  String _friendlyAuthMessage(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('login') ||
+        lower.contains('cookie') ||
+        lower.contains('private') ||
+        lower.contains('unavailable')) {
+      return '$message\n\n'
+          'If this is a private or friends-only video, open Settings → '
+          'Facebook and log in (or set cookies.txt / import from browser).';
+    }
+    return message;
+  }
+
   static String _decodeOutput(Object? output) {
     if (output == null) return '';
     if (output is String) return output;

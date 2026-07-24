@@ -9,6 +9,7 @@ import '../../data/download_repository.dart';
 import '../../extension/download_capture.dart';
 import '../../facebook/facebook_metadata_client.dart';
 import '../../facebook/facebook_models.dart';
+import '../../facebook/facebook_session.dart';
 import '../../providers.dart';
 import '../../services/download_service.dart';
 import '../../services/url_classifier.dart';
@@ -180,9 +181,14 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
                     ),
                     if (_isFacebookFlow) ...[
                       const SizedBox(height: 8),
-                      const Text(
-                        'Public Facebook videos only (extracted with yt-dlp).',
-                        style: TextStyle(fontSize: 12),
+                      Text(
+                        Platform.isAndroid
+                            ? 'Public videos work without login. '
+                                'Private/friends-only need Facebook login in Settings.'
+                            : 'Public videos work without cookies. '
+                                'Private/friends-only need cookies.txt or '
+                                'browser import in Settings → Facebook.',
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ],
                   ],
@@ -308,7 +314,8 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
       return 'YouTube videos are extracted and saved to Downloads.';
     }
     if (_isFacebookFlow) {
-      return 'Public Facebook videos only. Progressive MP4 is saved to Downloads.';
+      return 'Facebook videos save to Downloads. '
+          'Private/friends-only need Facebook login in Settings.';
     }
     return 'Files are saved to the system Downloads folder.';
   }
@@ -318,6 +325,11 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     return createYoutubeMetadataClient(
       ytdlpOverride: settings.ytdlpPath,
       ffmpegOverride: settings.ffmpegPath,
+      facebookCookieArgs: FacebookCookieArgs(
+        cookiesPath: settings.facebookCookiesPath,
+        fromBrowser: settings.facebookCookiesFromBrowser,
+      ),
+      facebookSession: ref.read(facebookSessionProvider),
     );
   }
 
@@ -553,7 +565,9 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     late final Map<String, String> progressiveUrls;
 
     if (Platform.isAndroid) {
-      final client = FacebookMetadataClient();
+      final cookieHeader =
+          await ref.read(facebookSessionProvider).cookieHeader();
+      final client = FacebookMetadataClient(cookieHeader: cookieHeader);
       try {
         final result = await client.fetchInfo(url);
         info = result.info;
@@ -643,15 +657,20 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
         ext: selection.ext,
         directUrl: directUrl,
       );
+      final fileName = _facebookFileName(
+        selection.fileName,
+        videoId: info.id,
+        ext: selection.ext,
+      );
       await ref.read(downloadServiceProvider).addDownload(
             NewDownload(
               url: url,
               directory: directory,
-              fileName: selection.fileName,
+              fileName: fileName,
               split: Platform.isAndroid ? _split : 1,
               startImmediately: _startImmediately,
               metadata: DownloadMetadata(
-                fileName: selection.fileName,
+                fileName: fileName,
                 totalLength: 0,
               ),
               headers: widget.capture?.headers ?? const {},
@@ -670,6 +689,26 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
     }
   }
 
+  /// Avoids collapsing many logged-in Facebook titles to the same Facebook.mp4.
+  String _facebookFileName(
+    String preferred, {
+    required String videoId,
+    required String ext,
+  }) {
+    final cleanedExt = ext.startsWith('.') ? ext.substring(1) : ext;
+    final safeExt = cleanedExt.isEmpty ? 'mp4' : cleanedExt;
+    var base = preferred.trim();
+    if (base.toLowerCase().endsWith('.$safeExt')) {
+      base = base.substring(0, base.length - safeExt.length - 1);
+    }
+    if (base.isEmpty || base.toLowerCase() == 'facebook') {
+      base = videoId.isNotEmpty ? 'facebook_$videoId' : 'facebook_video';
+    } else if (videoId.isNotEmpty && !base.contains(videoId)) {
+      base = '${base}_$videoId';
+    }
+    return '$base.$safeExt';
+  }
+
   String _friendlyFacebookDesktopError(String message) {
     final lower = message.toLowerCase();
     if (lower.contains('login') ||
@@ -677,7 +716,8 @@ class _AddDownloadDialogState extends ConsumerState<AddDownloadDialog> {
         lower.contains('private') ||
         lower.contains('unavailable')) {
       return 'Could not extract this Facebook video. '
-          'Only public videos are supported (no login). Details: $message';
+          'For private/friends-only videos, open Settings → Facebook and set '
+          'cookies.txt or import from browser. Details: $message';
     }
     return message;
   }

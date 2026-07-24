@@ -11,6 +11,7 @@ import 'engine/download_engine.dart';
 import 'engine/explode_youtube_download_engine.dart';
 import 'engine/ytdlp_download_engine.dart';
 import 'extension/download_capture.dart';
+import 'facebook/facebook_session.dart';
 import 'services/diagnostics.dart';
 import 'services/download_service.dart';
 import 'ytdlp/youtube_metadata_client.dart';
@@ -76,17 +77,37 @@ final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   return DownloadRepository(ref.watch(databaseProvider));
 });
 
+final facebookSessionProvider = Provider<FacebookSession>((ref) {
+  return FacebookSession();
+});
+
 final downloadEngineProvider = Provider<DownloadEngine>((ref) {
   final diagnostics = ref.watch(diagnosticsLogProvider);
+  final session = ref.watch(facebookSessionProvider);
+  final repository = ref.watch(downloadRepositoryProvider);
+  // Read cookie settings on demand so saving Settings does not recreate the
+  // engine and drop in-flight yt-dlp jobs.
+  Future<FacebookCookieArgs> cookieArgs() async {
+    final settings = await repository.getSettings();
+    return FacebookCookieArgs(
+      cookiesPath: settings.facebookCookiesPath,
+      fromBrowser: settings.facebookCookiesFromBrowser,
+    );
+  }
+
   final base = Platform.isAndroid
       ? AndroidDownloadEngine()
       : Aria2DownloadEngine(diagnostics: diagnostics);
   final youtube = Platform.isAndroid
       ? ExplodeYoutubeDownloadEngine()
-      : YtdlpDownloadEngine();
+      : YtdlpDownloadEngine(
+          facebookCookieArgsProvider: cookieArgs,
+          facebookSession: session,
+        );
   return CompositeDownloadEngine(
     baseEngine: base,
     youtubeEngine: youtube,
+    facebookCookieHeader: session.cookieHeader,
   );
 });
 
@@ -98,6 +119,11 @@ final ytdlpClientProvider = Provider<YoutubeMetadataClient>((ref) {
   return createYoutubeMetadataClient(
     ytdlpOverride: settings?.ytdlpPath ?? '',
     ffmpegOverride: settings?.ffmpegPath ?? '',
+    facebookCookieArgs: FacebookCookieArgs(
+      cookiesPath: settings?.facebookCookiesPath ?? '',
+      fromBrowser: settings?.facebookCookiesFromBrowser ?? '',
+    ),
+    facebookSession: ref.watch(facebookSessionProvider),
   );
 });
 

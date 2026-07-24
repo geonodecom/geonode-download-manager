@@ -23,12 +23,15 @@ class FacebookExtractResult {
 }
 
 class FacebookMetadataClient {
-  FacebookMetadataClient({http.Client? httpClient})
-      : _http = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null;
+  FacebookMetadataClient({
+    http.Client? httpClient,
+    this.cookieHeader = '',
+  }) : _http = httpClient ?? http.Client(),
+       _ownsClient = httpClient == null;
 
   final http.Client _http;
   final bool _ownsClient;
+  final String cookieHeader;
 
   // Browser UAs are often rejected (HTTP 400). yt-dlp uses facebookexternalhit.
   static const _externalHitUserAgent = 'facebookexternalhit/1.1';
@@ -111,8 +114,9 @@ class FacebookMetadataClient {
 
     if (found.isEmpty) {
       throw YtdlpException(
-        'No public progressive Facebook video URL was found. '
-        'Only public videos are supported (no login / private / DRM).',
+        'No progressive Facebook video URL was found. '
+        'Public videos work without login; private/friends-only need '
+        'Facebook login in Settings.',
       );
     }
 
@@ -146,8 +150,9 @@ class FacebookMetadataClient {
 
     if (formats.isEmpty) {
       throw YtdlpException(
-        'No public progressive Facebook video URL was found. '
-        'Only public videos are supported (no login / private / DRM).',
+        'No progressive Facebook video URL was found. '
+        'Public videos work without login; private/friends-only need '
+        'Facebook login in Settings.',
       );
     }
 
@@ -181,6 +186,7 @@ class FacebookMetadataClient {
                   'Accept':
                       'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                   'Accept-Language': 'en-US,en;q=0.9',
+                  if (cookieHeader.isNotEmpty) 'Cookie': cookieHeader,
                 },
               )
               .timeout(const Duration(seconds: 30));
@@ -194,7 +200,14 @@ class FacebookMetadataClient {
           if (_htmlLooksUseful(body)) {
             return body;
           }
+          if (_looksLikeLoginWall(body) && cookieHeader.isEmpty) {
+            throw YtdlpException(
+              'Facebook asked for login. Open Settings → Facebook and log in '
+              'to download private or friends-only videos.',
+            );
+          }
         } catch (error) {
+          if (error is YtdlpException) rethrow;
           lastError = error;
         }
       }
@@ -203,16 +216,20 @@ class FacebookMetadataClient {
     if (lastStatus >= 400) {
       throw YtdlpException(
         'Facebook returned HTTP $lastStatus while loading the page. '
-        'This is often blocked scraping, not privacy — try again later, '
-        'or open the link in a browser to confirm it loads.',
+        '${cookieHeader.isEmpty ? "Try logging in under Settings → Facebook. " : ""}'
+        'Or open the link in a browser to confirm it loads.',
       );
     }
     if (lastError != null) {
       throw YtdlpException('Failed to load Facebook page: $lastError');
     }
     throw YtdlpException(
-      'No public progressive Facebook video URL was found. '
-      'Only public videos are supported (no login / private / DRM).',
+      cookieHeader.isEmpty
+          ? 'No progressive Facebook video URL was found. '
+              'Public videos work without login; private/friends-only videos '
+              'need Facebook login in Settings.'
+          : 'No progressive Facebook video URL was found for this session. '
+              'The video may be unavailable, DRM-only, or your login expired.',
     );
   }
 
@@ -263,6 +280,14 @@ class FacebookMetadataClient {
         html.contains('browser_native_') ||
         html.contains('progressive_url') ||
         html.contains('og:video');
+  }
+
+  static bool _looksLikeLoginWall(String html) {
+    final lower = html.toLowerCase();
+    return lower.contains('log in') ||
+        lower.contains('login') ||
+        lower.contains('create new account') ||
+        lower.contains('"login_form"');
   }
 
   static String _unescapeFacebookText(String value) {

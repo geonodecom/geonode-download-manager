@@ -17,9 +17,10 @@ targets. Desktop builds use system `aria2c`. Android uses a native foreground
 service with segmented HTTP Range downloads and publishes completed files to the
 system Downloads collection via MediaStore.
 
-The app focuses on direct HTTP/HTTPS file downloads, YouTube and public Facebook
-video extraction, queueing, resume, and useful download details. Torrent downloads
-are not implemented yet; see [Roadmap](#roadmap).
+The app focuses on direct HTTP/HTTPS file downloads, YouTube and Facebook
+video extraction (including private Facebook via session login), queueing,
+resume, and useful download details. Torrent downloads are not implemented yet;
+see [Roadmap](#roadmap).
 
 ## Features
 
@@ -35,14 +36,15 @@ are not implemented yet; see [Roadmap](#roadmap).
 - [x] Android share / open-with intake for direct HTTP(S) URLs
 - [x] YouTube video download with format selection (desktop: yt-dlp + ffmpeg; Android: built-in extractor)
 - [x] YouTube playlists (queue each entry) and common URL styles (watch, Shorts, live, embed, music, youtu.be)
-- [x] Public Facebook / fb.watch video download (desktop: yt-dlp; Android: progressive CDN extraction + HTTP)
+- [x] Facebook / fb.watch video download (desktop: yt-dlp; Android: progressive CDN extraction + HTTP)
+- [x] Private / friends-only Facebook videos via in-app session login (Android WebView) or desktop cookies.txt / browser cookie import
 
 ## Roadmap
 
 Planned work (not shipped):
 
 - [ ] YouTube authenticated / private streams and channel pages
-- [ ] Facebook login / private videos and more sites (Dailymotion, …)
+- [ ] More video sites (Dailymotion, …)
 - [ ] Torrent / magnet support
 - [ ] Signed Play Store releases (production keystore in CI)
 - [x] Automated Windows release zip in CI
@@ -111,7 +113,11 @@ Android direct HTTP downloads run in `DownloadForegroundService`. YouTube on
 Android uses `youtube_explode_dart` for metadata/streams and bundled ffmpeg
 (`libffmpeg.so`) to merge high-resolution video+audio (same style of format
 list as desktop). Public Facebook videos are resolved to progressive CDN MP4
-URLs and downloaded over HTTP (no yt-dlp process). APK size grows substantially
+URLs and downloaded over HTTP (no yt-dlp process). Private Facebook videos use
+an in-app WebView login that stores session cookies on-device (Settings →
+Facebook); those cookies are sent with page and CDN requests. On desktop,
+yt-dlp can also use a Netscape cookies.txt file or `--cookies-from-browser`.
+APK size grows substantially
 because static ffmpeg is packaged per ABI. YouTube downloading may conflict
 with Play Store policy; sideload/dev builds are the safest target for now.
 
