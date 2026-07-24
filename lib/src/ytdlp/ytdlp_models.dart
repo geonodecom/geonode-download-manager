@@ -109,16 +109,76 @@ class YtdlpFormat {
     final resolution = height > 0
         ? '${width > 0 ? width : '?'}x$height'
         : json['resolution']?.toString() ?? '';
+    final formatId = json['format_id']?.toString() ?? '';
+    final ext = json['ext']?.toString() ?? '';
+    final note = json['format_note']?.toString() ?? '';
+    var vcodec = _codecOrNone(json['vcodec']);
+    var acodec = _codecOrNone(json['acodec']);
+    final hasUrl = (json['url']?.toString() ?? '').trim().isNotEmpty;
+
+    // Facebook (and some other extractors) emit progressive mp4 entries without
+    // vcodec/acodec. Treat those as combined so they appear in the picker.
+    if (vcodec == 'none' && acodec == 'none') {
+      final lowerExt = ext.toLowerCase();
+      if (lowerExt == 'm4a' ||
+          lowerExt == 'mp3' ||
+          lowerExt == 'aac' ||
+          lowerExt == 'opus' ||
+          lowerExt == 'ogg') {
+        acodec = 'unknown';
+      } else if (_isLikelyProgressiveMuxed(
+        ext: ext,
+        formatId: formatId,
+        note: note,
+        hasUrl: hasUrl,
+      )) {
+        vcodec = 'unknown';
+        acodec = 'unknown';
+      }
+    }
+
     return YtdlpFormat(
-      formatId: json['format_id']?.toString() ?? '',
-      ext: json['ext']?.toString() ?? '',
+      formatId: formatId,
+      ext: ext,
       resolution: resolution,
-      note: json['format_note']?.toString() ?? '',
+      note: note,
       fileSize: _parseNullableInt(json['filesize'] ?? json['filesize_approx']),
-      vcodec: json['vcodec']?.toString() ?? 'none',
-      acodec: json['acodec']?.toString() ?? 'none',
+      vcodec: vcodec,
+      acodec: acodec,
       format: json['format']?.toString() ?? '',
     );
+  }
+
+  static String _codecOrNone(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty || text.toLowerCase() == 'null') return 'none';
+    return text;
+  }
+
+  static bool _isLikelyProgressiveMuxed({
+    required String ext,
+    required String formatId,
+    required String note,
+    required bool hasUrl,
+  }) {
+    final lowerExt = ext.toLowerCase();
+    if (lowerExt == 'mp4' ||
+        lowerExt == 'mov' ||
+        lowerExt == 'webm' ||
+        lowerExt == 'mkv') {
+      return true;
+    }
+    final id = formatId.toLowerCase();
+    if (id == 'hd' || id == 'sd' || id == 'http-hd' || id == 'http-sd') {
+      return true;
+    }
+    final lowerNote = note.toLowerCase();
+    if (lowerNote.contains('progressive') ||
+        lowerNote == 'hd' ||
+        lowerNote == 'sd') {
+      return true;
+    }
+    return hasUrl && lowerExt.isNotEmpty && lowerExt != 'mhtml';
   }
 }
 
@@ -182,7 +242,13 @@ class YtdlpVideoInfo {
     }
 
     result.addAll(audioOnly.take(4));
-    return _dedupeByFormatId(result);
+    final deduped = _dedupeByFormatId(result);
+    if (deduped.isNotEmpty) return deduped;
+
+    // Last resort: show raw entries so Facebook-style metadata still works.
+    final fallback = formats.where((f) => f.formatId.isNotEmpty).toList()
+      ..sort(_compareFormats);
+    return _dedupeByFormatId(fallback);
   }
 
   String? defaultFormatId(YoutubeFormatPreset preset) {

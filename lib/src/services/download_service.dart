@@ -224,8 +224,28 @@ class DownloadService {
       final updated = await _repository.updateFromAria2(status);
       if (!updated) await _handleUnmatchedEngineStatus(status);
     }
+    await _reconcileStaleExtractorJobs(statuses);
     await _fillQueuedMetadata();
     await resumeQueued();
+  }
+
+  /// yt-dlp jobs live only in memory; after an engine recreate their gids vanish.
+  Future<void> _reconcileStaleExtractorJobs(List<Aria2Status> statuses) async {
+    final knownGids = {for (final status in statuses) status.gid};
+    final active = await _repository.listByStatuses({
+      DownloadStatus.active,
+      DownloadStatus.queued,
+    });
+    for (final download in active) {
+      final gid = download.gid;
+      if (gid == null || !gid.startsWith('ytdlp:')) continue;
+      if (knownGids.contains(gid)) continue;
+      _diagnostics?.warn(
+        'Re-queueing download after missing yt-dlp job: ${download.url}',
+      );
+      await _repository.clearRetryState(download.id);
+      await _repository.updateStatus(download.id, DownloadStatus.queued);
+    }
   }
 
   Future<void> _handleUnmatchedEngineStatus(Aria2Status status) async {
@@ -291,6 +311,19 @@ class DownloadService {
 
   Future<void> _startEntity(DownloadEntity entity) async {
     try {
+      if (entity.gid != null) {
+        final status = await _engine.tellStatus(entity.gid!);
+        final restarted = status.status == 'error' &&
+            (status.errorMessage?.contains('engine restarted') ?? false);
+        if (restarted) {
+          await _repository.clearRetryState(entity.id);
+          entity = (await _repository.findById(entity.id)) ?? entity;
+        } else {
+          await _repository.updateFromAria2(status);
+          return;
+        }
+      }
+
       if (entity.gid != null) {
         final status = await _engine.tellStatus(entity.gid!);
         await _repository.updateFromAria2(status);

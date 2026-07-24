@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../aria2/aria2_models.dart';
 import '../facebook/facebook_models.dart';
+import '../facebook/facebook_session.dart';
 import '../ytdlp/ytdlp_executable.dart';
 import '../ytdlp/ytdlp_models.dart';
 import '../ytdlp/ytdlp_progress.dart';
@@ -43,12 +44,20 @@ class YtdlpDownloadEngine implements DownloadEngine {
   YtdlpDownloadEngine({
     YtdlpExecutableResolver? resolver,
     Future<String?> Function(String sourcePath, String displayName)? publishFile,
+    this.facebookCookieArgs = const FacebookCookieArgs(),
+    Future<FacebookCookieArgs> Function()? facebookCookieArgsProvider,
+    FacebookSession? facebookSession,
   }) : _resolver = resolver ?? YtdlpExecutableResolver(),
-       _publishFile = publishFile ?? _defaultPublishFile;
+       _publishFile = publishFile ?? _defaultPublishFile,
+       _facebookCookieArgsProvider = facebookCookieArgsProvider,
+       _facebookSession = facebookSession ?? FacebookSession();
 
   final YtdlpExecutableResolver _resolver;
   final Future<String?> Function(String sourcePath, String displayName)
   _publishFile;
+  final FacebookCookieArgs facebookCookieArgs;
+  final Future<FacebookCookieArgs> Function()? _facebookCookieArgsProvider;
+  final FacebookSession _facebookSession;
   final Map<String, _YtdlpJob> _jobs = {};
   var _started = false;
   String _downloadDirectory = '';
@@ -119,13 +128,16 @@ class YtdlpDownloadEngine implements DownloadEngine {
     final resolvedName = fileName?.trim().isNotEmpty == true
         ? fileName!.trim()
         : options.sanitizedFileName;
-    final outputPath = p.join(targetDirectory, resolvedName);
+    final outputPath = await _uniqueOutputPath(
+      p.join(targetDirectory, resolvedName),
+    );
+    final uniqueName = p.basename(outputPath);
 
     final job = _YtdlpJob(
       gid: gid,
       url: url,
       directory: targetDirectory,
-      fileName: resolvedName,
+      fileName: uniqueName,
       options: options,
       outputPath: outputPath,
     );
@@ -165,7 +177,23 @@ class YtdlpDownloadEngine implements DownloadEngine {
   Future<Aria2Status> tellStatus(String gid) async {
     final job = _jobs[gid];
     if (job == null) {
-      throw StateError('Unknown yt-dlp job: $gid');
+      // Engine may have been recreated (e.g. settings save). Surface a clear
+      // recoverable error instead of crashing the poll loop.
+      return Aria2Status(
+        gid: gid,
+        status: 'error',
+        totalLength: 0,
+        completedLength: 0,
+        downloadSpeed: 0,
+        connections: 0,
+        pieceLength: 0,
+        numPieces: 0,
+        bitfield: null,
+        errorCode: null,
+        errorMessage:
+            'Download engine restarted. Tap Retry to continue this download.',
+        files: const [],
+      );
     }
     return _toStatus(job);
   }
@@ -228,6 +256,10 @@ class YtdlpDownloadEngine implements DownloadEngine {
       job.status = 'active';
       job.errorMessage = null;
 
+      final cookieArgsProvider = _facebookCookieArgsProvider;
+      final cookieSettings = cookieArgsProvider != null
+          ? await cookieArgsProvider()
+          : facebookCookieArgs;
       final args = [
         '--no-playlist',
         '--continue',
@@ -241,6 +273,11 @@ class YtdlpDownloadEngine implements DownloadEngine {
         job.options.formatId,
         '-o',
         job.outputPath,
+        ...await resolveYtdlpFacebookCookieArgs(
+          settings: cookieSettings,
+          session: _facebookSession,
+          url: job.url,
+        ),
         job.url,
       ];
 
@@ -296,6 +333,18 @@ class YtdlpDownloadEngine implements DownloadEngine {
       job.status = 'error';
       job.errorMessage = error.toString();
     }
+  }
+
+  Future<String> _uniqueOutputPath(String path) async {
+    if (!await File(path).exists()) return path;
+    final dir = p.dirname(path);
+    final ext = p.extension(path);
+    final base = p.basenameWithoutExtension(path);
+    for (var i = 1; i < 1000; i++) {
+      final candidate = p.join(dir, '$base ($i)$ext');
+      if (!await File(candidate).exists()) return candidate;
+    }
+    return p.join(dir, '$base-${const Uuid().v4()}$ext');
   }
 
   Future<void> _finalizeJob(_YtdlpJob job) async {

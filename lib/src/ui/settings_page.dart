@@ -5,12 +5,14 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../data/app_database.dart';
 import '../platform/bundled_executable.dart';
 import '../platform/executable_finder.dart';
 import '../providers.dart';
 import '../ytdlp/android_ffmpeg.dart';
+import 'widgets/facebook_login_dialog.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -54,14 +56,18 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
   late final TextEditingController _aria2Path;
   late final TextEditingController _ytdlpPath;
   late final TextEditingController _ffmpegPath;
+  late final TextEditingController _facebookCookiesPath;
   late int _maxActive;
   late int _split;
   late String _themeMode;
   late String _youtubeFormatPreset;
+  late String _facebookCookiesFromBrowser;
   final List<_ValidationMessage> _messages = [];
   var _saving = false;
   var _checkingBundledTools = false;
   String? _bundledToolsStatus;
+  var _facebookLoggedIn = false;
+  var _facebookSessionLoading = true;
 
   @override
   void initState() {
@@ -70,11 +76,19 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     _aria2Path = TextEditingController(text: widget.settings.aria2Path);
     _ytdlpPath = TextEditingController(text: widget.settings.ytdlpPath);
     _ffmpegPath = TextEditingController(text: widget.settings.ffmpegPath);
+    _facebookCookiesPath =
+        TextEditingController(text: widget.settings.facebookCookiesPath);
     _maxActive = widget.settings.maxActiveDownloads;
     _split = widget.settings.defaultSplit;
     _themeMode = widget.settings.themeMode;
     _youtubeFormatPreset = widget.settings.youtubeFormatPreset;
+    _facebookCookiesFromBrowser = widget.settings.facebookCookiesFromBrowser;
     unawaited(_refreshBundledToolsStatus());
+    if (Platform.isAndroid) {
+      unawaited(_refreshFacebookSession());
+    } else {
+      _facebookSessionLoading = false;
+    }
   }
 
   @override
@@ -83,6 +97,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     _aria2Path.dispose();
     _ytdlpPath.dispose();
     _ffmpegPath.dispose();
+    _facebookCookiesPath.dispose();
     super.dispose();
   }
 
@@ -251,6 +266,95 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               setState(() => _youtubeFormatPreset = value ?? 'best_mp4'),
         ),
         const SizedBox(height: 20),
+        _SectionLabel(label: 'Facebook'),
+        const SizedBox(height: 8),
+        if (isAndroid) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Account session'),
+            subtitle: Text(
+              _facebookSessionLoading
+                  ? 'Checking…'
+                  : _facebookLoggedIn
+                      ? 'Logged in (session cookies stored on this device)'
+                      : 'Not logged in — public videos still work',
+            ),
+            trailing: _facebookSessionLoading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonal(
+                onPressed: _facebookSessionLoading ? null : _loginFacebook,
+                child: const Text('Log in'),
+              ),
+              OutlinedButton(
+                onPressed: !_facebookLoggedIn || _facebookSessionLoading
+                    ? null
+                    : _logoutFacebook,
+                child: const Text('Log out'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Private / friends-only videos need a Facebook login on this device. '
+            'Session cookies can access your account — log out on shared devices. '
+            'Cookies are never sent to Geonode servers.',
+            style: TextStyle(fontSize: 12),
+          ),
+        ] else ...[
+          const Text(
+            'Private / friends-only Facebook videos need cookies for yt-dlp. '
+            'Public videos work without cookies. Cookie data stays on this PC.',
+            style: TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _facebookCookiesPath,
+                  decoration: const InputDecoration(
+                    labelText: 'cookies.txt (Netscape)',
+                    hintText: 'Exported Facebook cookies for yt-dlp',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: _pickFacebookCookiesFile,
+                child: const Text('Browse'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _facebookCookiesFromBrowser.isEmpty
+                ? ''
+                : _facebookCookiesFromBrowser,
+            decoration: const InputDecoration(
+              labelText: 'Import cookies from browser',
+              helperText: 'Close the browser first. Takes priority after cookies.txt.',
+            ),
+            items: const [
+              DropdownMenuItem(value: '', child: Text('None')),
+              DropdownMenuItem(value: 'chrome', child: Text('Chrome')),
+              DropdownMenuItem(value: 'edge', child: Text('Edge')),
+              DropdownMenuItem(value: 'firefox', child: Text('Firefox')),
+            ],
+            onChanged: (value) => setState(
+              () => _facebookCookiesFromBrowser = value ?? '',
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
         _SectionLabel(label: 'Appearance'),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
@@ -293,6 +397,62 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
   Future<void> _pickDirectory() async {
     final path = await getDirectoryPath(initialDirectory: _directory.text);
     if (path != null) _directory.text = path;
+  }
+
+  Future<void> _refreshFacebookSession() async {
+    setState(() => _facebookSessionLoading = true);
+    final loggedIn = await ref.read(facebookSessionProvider).isLoggedIn;
+    if (!mounted) return;
+    setState(() {
+      _facebookLoggedIn = loggedIn;
+      _facebookSessionLoading = false;
+    });
+  }
+
+  Future<void> _loginFacebook() async {
+    final ok = await showFacebookLoginDialog(
+      context,
+      session: ref.read(facebookSessionProvider),
+    );
+    if (ok == true) {
+      await _refreshFacebookSession();
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          const _ValidationMessage.success('Facebook session saved.'),
+        );
+      });
+    }
+  }
+
+  Future<void> _logoutFacebook() async {
+    await ref.read(facebookSessionProvider).clear();
+    if (Platform.isAndroid) {
+      try {
+        await WebViewCookieManager().clearCookies();
+      } catch (_) {}
+    }
+    await _refreshFacebookSession();
+    if (!mounted) return;
+    setState(() {
+      _messages.add(
+        const _ValidationMessage.success('Facebook session cleared.'),
+      );
+    });
+  }
+
+  Future<void> _pickFacebookCookiesFile() async {
+    final file = await openFile(
+      acceptedTypeGroups: [
+        const XTypeGroup(
+          label: 'cookies',
+          extensions: ['txt'],
+        ),
+      ],
+    );
+    if (file != null) {
+      setState(() => _facebookCookiesPath.text = file.path);
+    }
   }
 
   Future<void> _refreshBundledToolsStatus() async {
@@ -475,6 +635,9 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
               ffmpegPath: ffmpegPath,
               youtubeFormatPreset: _youtubeFormatPreset,
               themeMode: _themeMode,
+              facebookCookiesPath: isAndroid ? '' : _facebookCookiesPath.text.trim(),
+              facebookCookiesFromBrowser:
+                  isAndroid ? '' : _facebookCookiesFromBrowser,
             ),
           );
     } catch (error) {

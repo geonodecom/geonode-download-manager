@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../facebook/facebook_session.dart';
 import 'explode_youtube_client.dart';
 import 'ytdlp_client.dart';
 import 'ytdlp_models.dart';
@@ -17,6 +18,8 @@ abstract class YoutubeMetadataClient {
 YoutubeMetadataClient createYoutubeMetadataClient({
   String ytdlpOverride = '',
   String ffmpegOverride = '',
+  FacebookCookieArgs facebookCookieArgs = const FacebookCookieArgs(),
+  FacebookSession? facebookSession,
 }) {
   if (Platform.isAndroid) {
     return ExplodeYoutubeClient();
@@ -24,5 +27,7 @@ YoutubeMetadataClient createYoutubeMetadataClient({
   return YtdlpClient(
     ytdlpOverride: ytdlpOverride,
     ffmpegOverride: ffmpegOverride,
+    facebookCookieArgs: facebookCookieArgs,
+    facebookSession: facebookSession,
   );
 }

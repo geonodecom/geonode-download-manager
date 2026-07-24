@@ -94,6 +94,8 @@ class GeonodeSettings {
     required this.ffmpegPath,
     required this.youtubeFormatPreset,
     required this.themeMode,
+    this.facebookCookiesPath = '',
+    this.facebookCookiesFromBrowser = '',
   });
 
   final String downloadDirectory;
@@ -104,6 +106,8 @@ class GeonodeSettings {
   final String ffmpegPath;
   final String youtubeFormatPreset;
   final String themeMode;
+  final String facebookCookiesPath;
+  final String facebookCookiesFromBrowser;
 
   GeonodeSettings copyWith({
     String? downloadDirectory,
@@ -114,6 +118,8 @@ class GeonodeSettings {
     String? ffmpegPath,
     String? youtubeFormatPreset,
     String? themeMode,
+    String? facebookCookiesPath,
+    String? facebookCookiesFromBrowser,
   }) {
     return GeonodeSettings(
       downloadDirectory: downloadDirectory ?? this.downloadDirectory,
@@ -125,6 +131,10 @@ class GeonodeSettings {
       youtubeFormatPreset:
           youtubeFormatPreset ?? this.youtubeFormatPreset,
       themeMode: themeMode ?? this.themeMode,
+      facebookCookiesPath:
+          facebookCookiesPath ?? this.facebookCookiesPath,
+      facebookCookiesFromBrowser:
+          facebookCookiesFromBrowser ?? this.facebookCookiesFromBrowser,
     );
   }
 }

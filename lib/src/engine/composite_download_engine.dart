@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../aria2/aria2_models.dart';
 import '../facebook/facebook_models.dart';
+import '../facebook/facebook_session.dart';
 import '../ytdlp/ytdlp_models.dart';
 import 'download_engine.dart';
 import 'ytdlp_download_engine.dart';
@@ -11,11 +12,15 @@ class CompositeDownloadEngine implements DownloadEngine {
   CompositeDownloadEngine({
     required DownloadEngine baseEngine,
     DownloadEngine? youtubeEngine,
+    Future<String> Function()? facebookCookieHeader,
   }) : _baseEngine = baseEngine,
-       _youtubeEngine = youtubeEngine ?? YtdlpDownloadEngine();
+       _youtubeEngine = youtubeEngine ?? YtdlpDownloadEngine(),
+       _facebookCookieHeader =
+           facebookCookieHeader ?? _defaultFacebookCookieHeader;
 
   final DownloadEngine _baseEngine;
   final DownloadEngine _youtubeEngine;
+  final Future<String> Function() _facebookCookieHeader;
 
   DownloadEngine get youtubeEngine => _youtubeEngine;
 
@@ -24,12 +29,15 @@ class CompositeDownloadEngine implements DownloadEngine {
       'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
+  static Future<String> _defaultFacebookCookieHeader() {
+    return FacebookSession().cookieHeader();
+  }
+
   DownloadEngine _engineForOptions(Map<String, Object?>? optionsJson) {
     final kind = optionsJson?['kind']?.toString();
     if (kind == YoutubeDownloadOptions.kind) {
       return _youtubeEngine;
     }
-    // Desktop Facebook uses yt-dlp; Android resolves a CDN URL and uses HTTP.
     if (kind == FacebookDownloadOptions.kind && !Platform.isAndroid) {
       return _youtubeEngine;
     }
@@ -92,7 +100,7 @@ class CompositeDownloadEngine implements DownloadEngine {
     Map<String, String> headers = const {},
     int? position,
     Map<String, Object?>? optionsJson,
-  }) {
+  }) async {
     final kind = optionsJson?['kind']?.toString();
     if (kind == FacebookDownloadOptions.kind && Platform.isAndroid) {
       final directUrl = optionsJson?['directUrl']?.toString() ?? '';
@@ -101,6 +109,7 @@ class CompositeDownloadEngine implements DownloadEngine {
           'Facebook download on Android requires a progressive CDN URL.',
         );
       }
+      final cookie = await _facebookCookieHeader();
       return _baseEngine.addUri(
         url: directUrl,
         directory: directory,
@@ -110,6 +119,7 @@ class CompositeDownloadEngine implements DownloadEngine {
           ...headers,
           'Referer': _facebookReferer,
           'User-Agent': _facebookUserAgent,
+          if (cookie.isNotEmpty) 'Cookie': cookie,
         },
         position: position,
         optionsJson: optionsJson,
